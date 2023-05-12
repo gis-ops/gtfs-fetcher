@@ -1,0 +1,37 @@
+[build-system]
+requires = [
+    "setuptools>=45",
+    "wheel",
+    "setuptools_scm>=6.2",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gtfs-fetcher"
+version = "0.1.0"
+description = "Download, validate, and manage GTFS transit feeds"
+readme = "README.rst"
+requires-python = ">=3.10"
+license = {file = "LICENSE.txt"}
+authors = [
+  {email = "nils@gis-ops.com"}
+]
+maintainers = [
+  {name = "Nils Nolde", email = "nils@gis-ops.com"}
+]
+
+dependencies = [
+"beautifulsoup4 = 4.6.3",
+"cffi = 1.11.5",
+"cryptography = 3.2",
+"enum34 = 1.1.6",
+"ndg-httpsclient = 0.5.1",
+"prettytable = 0.7.2",
+"pyasn1 = 0.4.4",
+"pycparser = 2.19",
+"pyOpenSSL = 18.0.0",
+"pytz = 2018.7",
+"requests = 2.20.0",
+"six = 1.11.0",
+"transitfeed = 1.2.16"
+]
