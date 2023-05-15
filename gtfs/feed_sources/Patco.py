@@ -3,8 +3,8 @@
 import logging
 import requests
 from bs4 import BeautifulSoup
-
-from gtfs.utils.FeedSource import FeedSource
+from utils.set_dict_attrs import set_dict_attrs
+from utils.FeedSource import FeedSource
 
 DEVPAGE_URL = 'http://www.ridepatco.org/developers/'
 FILE_NAME = 'PortAuthorityTransitCorporation.zip'
@@ -18,7 +18,7 @@ class Patco(FeedSource):
         super(Patco, self).__init__()
         url = self.find_download_url()
         if url:
-            self.urls = {'patco.zip': url}
+            set_dict_attrs(self, {'patco.zip': url})
         else:
             LOG.error('Could not scrape PATCO GTFS download URL from developer page')
             self.urls = {}

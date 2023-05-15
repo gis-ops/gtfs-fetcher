@@ -2,11 +2,11 @@
 
 from datetime import datetime
 import logging
-
+from utils.set_dict_attrs import set_dict_attrs
 from bs4 import BeautifulSoup
 import requests
 
-from gtfs.utils.FeedSource import FeedSource, TIMECHECK_FMT
+from utils.FeedSource import FeedSource, TIMECHECK_FMT
 
 URL = 'http://trilliumtransit.com/transit_feeds/path-nj-us/'
 FILE_NAME = 'path.zip'
@@ -21,7 +21,7 @@ class Path(FeedSource):
         super(Path, self).__init__()
         # The name of the download file changes on occasion.
         # Go scrape the directory listing to find out what it is now, and update url if found.
-        self.urls = {FILE_NAME: URL + 'path-nj-us.zip'}
+        set_dict_attrs(self, {FILE_NAME: URL + 'path-nj-us.zip'})
         response = requests.get(URL)
         if response.ok:
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -37,7 +37,7 @@ class Path(FeedSource):
                           filename,
                           self.last_updated)
                 download_url = URL + filename
-                self.urls = {FILE_NAME: download_url}
+                set_dict_attrs(self, {FILE_NAME: download_url})
             else:
                 LOG.error('Could not parse directory listing for PATH.')
         else:

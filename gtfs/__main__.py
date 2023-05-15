@@ -1,25 +1,44 @@
 #!/usr/bin/env python
 """Command line interface for fetching GTFS."""
-import argparse
-import getpass
+import typer
+from chalky import chain
 import logging
-import sys
-
 from prettytable import PrettyTable
-
-from gtfs.utils.FeedSource import FeedSource
+from halo import Halo
+import importlib
+from utils.FeedSource import FeedSource
 import feed_sources
-# import all the available feed sources
-# pylint: disable=I0011,wildcard-import
-from feed_sources import *
 
 logging.basicConfig()
 LOG = logging.getLogger()
 LOG.setLevel(logging.INFO)
+# to create sub-commands
+app = typer.Typer()
+sources = list(feed_sources.__all__)
 
-def fetch_all(sources=None):
-    """Fetch from all FeedSources in the feed_sources directory.
+@app.command()
+def list_feeds(xmin:float, ymin:float, xmax:float, ymax:float):
+    """Filter feeds spatially based on bounding box. Pass negative args as ' -45.6774' for example."""
+    spinner = Halo(text='Filtering...', text_color="cyan", spinner='dots')
+    spinner.start()
+    ptable = PrettyTable(['Feed Source', 'Transit URL', 'Bounding Box'])
+    for src in sources:
+        if src == 'California':
+            module = importlib.import_module('feed_sources.' + src)
+            klass = getattr(module, src)
+            inst = klass()
+            for url in inst.urls:
+                bbox = inst.urls[url]['bbox']
+                # intersecting bbox
+                if bbox != None and (bbox[0] >= xmin and bbox[0] < xmax) and (bbox[1] >= ymin and bbox[1] < ymax) and (bbox[2] <= xmax and bbox[2] > xmin) and (bbox[3] <= ymax and bbox[3] > ymin):
+                    row=[src, chain.bright_yellow | inst.urls[url]['url'], bbox]
+                    ptable.add_row(row)
+    print("\n" + ptable.get_string())
+    spinner.succeed(chain.bright_green.bold | "All done!")
 
+@app.command()
+def fetch_feeds(sources=None):
+    """
     :param sources: List of :FeedSource: modules to fetch; if not set, will fetch all available.
     """
     statuses = {}  # collect the statuses for all the files
@@ -70,23 +89,5 @@ def fetch_all(sources=None):
     LOG.info('Results:\n%s', ptable.get_string())
     LOG.info('All done!')
 
-def main():
-    """Main entry point for command line interface."""
-    parser = argparse.ArgumentParser(description='Fetch GTFS feeds and validate them.')
-    parser.add_argument('--feeds', '-f',
-                        help='Comma-separated list of feeds to get (optional; default: all)')
-    parser.add_argument('--verbose', '-v', action='count',
-                        help='Set output log level to debug (default log level: info)')
-
-    args = parser.parse_args()
-    if args.verbose:
-        LOG.setLevel(logging.DEBUG)
-
-    if args.feeds:
-        sources = args.feeds.split(',')
-        fetch_all(sources=sources)
-    else:
-        fetch_all()
-
 if __name__ == '__main__':
-    main()
+    app()

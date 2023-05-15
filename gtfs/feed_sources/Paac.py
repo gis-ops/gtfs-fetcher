@@ -1,17 +1,16 @@
 """Fetch Port Authority of Allegheny County (Pittsburgh) feed."""
 from datetime import datetime
 import logging
-
+from utils.set_dict_attrs import set_dict_attrs
 from bs4 import BeautifulSoup
 import requests
 
-from gtfs.utils.FeedSource import FeedSource, TIMECHECK_FMT
+from utils.FeedSource import FeedSource, TIMECHECK_FMT
 
 URL = 'http://www.portauthority.org/GeneralTransitFeed/'
 FILE_NAME = 'paac.zip'
 
 LOG = logging.getLogger(__name__)
-
 
 class Paac(FeedSource):
     """Fetch Pittsburgh feed."""
@@ -26,7 +25,7 @@ class Paac(FeedSource):
             for anchor in anchors:
                 if anchor.text.endswith('.zip'):
                     LOG.debug('Found PAAC download file named %s', anchor.text)
-                    self.urls = {FILE_NAME: URL + anchor.text}
+                    set_dict_attrs(self, {anchor.text: URL + anchor.text})
             if not self.urls:
                 LOG.error('Could not parse directory listing for PAAC.')
         else:

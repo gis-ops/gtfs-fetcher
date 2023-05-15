@@ -4,10 +4,10 @@ from datetime import datetime
 import logging
 import os
 import zipfile
-
+from utils.set_dict_attrs import set_dict_attrs
 import requests
 
-from gtfs.utils.FeedSource import FeedSource, TIMECHECK_FMT
+from utils.FeedSource import FeedSource, TIMECHECK_FMT
 
 URL = 'https://api.github.com/repos/septadev/GTFS/releases/latest'
 LAST_UPDATED_FMT = '%Y-%m-%dT%H:%M:%SZ'
@@ -28,7 +28,7 @@ class Septa(FeedSource):
     """Fetch SEPTA feeds."""
     def __init__(self):
         super(Septa, self).__init__()
-        self.urls = {DOWNLOAD_FILE_NAME: URL}
+        set_dict_attrs(self, {DOWNLOAD_FILE_NAME: URL})
 
     def fetch(self):
         """Fetch SEPTA bus and rail feeds.

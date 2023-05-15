@@ -1,21 +1,19 @@
 """Fetch CT Transit (Connecticut) feeds."""
 import logging
-
-from gtfs.utils.FeedSource import FeedSource
+from utils.set_dict_attrs import set_dict_attrs
+from utils.FeedSource import FeedSource
 
 LOG = logging.getLogger(__name__)
 
-BASE_URL = 'http://www.cttransit.com/sites/default/files/gtfs/googlect_transit.zip'
-SHORELINE_EAST_URL = 'http://www.shorelineeast.com/google_transit.zip'
-HARTFORD_URL = 'http://www.hartfordline.com/files/gtfs/gtfs.zip'
-
+feeds ={
+    'ct_transit.zip': 'http://www.cttransit.com/sites/default/files/gtfs/googlect_transit.zip',
+    'ct_shoreline_east.zip': 'http://www.shorelineeast.com/google_transit.zip',
+    'ct_hartford_rail.zip': 'http://www.hartfordline.com/files/gtfs/gtfs.zip'
+}
 
 class CTTransit(FeedSource):
-    """Fetch PATH feed."""
+    """Fetch CT Transit (Connecticut) feed."""
     def __init__(self):
         super(CTTransit, self).__init__()
-        self.urls = {
-            'ct_transit.zip': BASE_URL,
-            'ct_shoreline_east.zip': SHORELINE_EAST_URL,
-            'ct_hartford_rail.zip': HARTFORD_URL
-        }
+        set_dict_attrs(self, feeds)
+

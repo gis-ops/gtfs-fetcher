@@ -3,10 +3,8 @@ from datetime import datetime
 import logging
 import os
 import urllib
-
-from gtfs.utils.FeedSource import FeedSource, TIMECHECK_FMT
-
-
+from utils.set_dict_attrs import set_dict_attrs
+from utils.FeedSource import FeedSource, TIMECHECK_FMT
 LOG = logging.getLogger(__name__)
 
 
@@ -15,9 +13,9 @@ class SantaRosa(FeedSource):
     def __init__(self):
         super(SantaRosa, self).__init__()
 
-        self.urls = {
+        set_dict_attrs(self, {
             'santa_rosa.zip': 'ftp://ftp.ci.santa-rosa.ca.us/SantaRosaCityBus/google_transit.zip'
-        }
+        })
 
     def fetch(self):
         for filename in self.urls:
