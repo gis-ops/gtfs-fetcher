@@ -12,29 +12,67 @@ import feed_sources
 logging.basicConfig()
 LOG = logging.getLogger()
 LOG.setLevel(logging.INFO)
-# to create sub-commands
 app = typer.Typer()
 sources = list(feed_sources.__all__)
+
+from queue import Queue
+from threading import Thread
+from time import time
+from utils.set_dict_attrs import get_bbox
+
+class BBOXWorker(Thread):
+
+    def __init__(self, queue):
+        Thread.__init__(self)
+        self.queue = queue
+
+    def run(self):
+        while True:
+            inst, url = self.queue.get()
+            try:
+                inst.urls[url]['bbox'] = get_bbox(inst.urls[url]['url'])
+            finally:
+                self.queue.task_done()
+
+def find_intersection(instances, xmin, ymin, xmax, ymax, ptable, spinner):
+    # find intersecting bbox
+    for inst in instances:
+        for url in inst.urls:
+            bbox = inst.urls[url]['bbox']
+            if bbox != None and (bbox[0] >= xmin and bbox[0] < xmax) and (bbox[1] >= ymin and bbox[1] < ymax) and (bbox[2] <= xmax and bbox[2] > xmin) and (bbox[3] <= ymax and bbox[3] > ymin):
+                row=[chain.bright_yellow | inst.urls[url]['url'], bbox]
+                ptable.add_row(row)
+    print("\n" + ptable.get_string())
+    spinner.succeed(chain.bright_green.bold | "All done!")
 
 @app.command()
 def list_feeds(xmin:float, ymin:float, xmax:float, ymax:float):
     """Filter feeds spatially based on bounding box. Pass negative args as ' -45.6774' for example."""
+    ts = time()
     spinner = Halo(text='Filtering...', text_color="cyan", spinner='dots')
     spinner.start()
-    ptable = PrettyTable(['Feed Source', 'Transit URL', 'Bounding Box'])
+    ptable = PrettyTable(['Transit URL', 'Bounding Box'])
+    queue = Queue()
+    instances = []
+
+    # Create 8 worker threads
+    for x in range(8):
+        worker = BBOXWorker(queue)
+        worker.daemon = True
+        worker.start()
+    
     for src in sources:
-        if src == 'California':
+        if src != 'Boston' and src != 'Paac':
             module = importlib.import_module('feed_sources.' + src)
             klass = getattr(module, src)
             inst = klass()
             for url in inst.urls:
-                bbox = inst.urls[url]['bbox']
-                # intersecting bbox
-                if bbox != None and (bbox[0] >= xmin and bbox[0] < xmax) and (bbox[1] >= ymin and bbox[1] < ymax) and (bbox[2] <= xmax and bbox[2] > xmin) and (bbox[3] <= ymax and bbox[3] > ymin):
-                    row=[src, chain.bright_yellow | inst.urls[url]['url'], bbox]
-                    ptable.add_row(row)
-    print("\n" + ptable.get_string())
-    spinner.succeed(chain.bright_green.bold | "All done!")
+                queue.put((inst, url))
+            instances.append(inst)
+
+    queue.join()
+    find_intersection(instances, xmin, ymin, xmax, ymax, ptable, spinner)
+    logging.info('Took %s', time() - ts)
 
 @app.command()
 def fetch_feeds(sources=None):

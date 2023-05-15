@@ -18,4 +18,4 @@ def get_bbox(url: str):
 def set_dict_attrs(self: object, feeds: dict):
     self.urls = {}
     for feed in feeds:
-        self.urls[feed] = {"url": feeds[feed], "bbox": get_bbox(feeds[feed])}
+        self.urls[feed] = {"url": feeds[feed], "bbox": None}
