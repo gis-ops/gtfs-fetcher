@@ -1,1 +1,2 @@
 pre-commit==2.20.0 ; python_version >= "3.7" and python_full_version < "4.0.0"
+virtualenv==20.16.6 ; python_version >= "3.7" and python_full_version < "4.0.0"
