@@ -4,6 +4,7 @@ import typer
 from typing_extensions import Annotated
 from chalky import chain
 import logging
+import sys
 from prettytable.colortable import ColorTable, Themes
 from halo import Halo
 from .feed_source import FeedSource
@@ -13,31 +14,45 @@ logging.basicConfig()
 LOG = logging.getLogger()
 LOG.setLevel(logging.INFO)
 app = typer.Typer()
+
+def check_predicate(value: str):
+    if value not in ['intersects', 'contains']:
+        raise typer.BadParameter('predicate must be one of intersects or contains')
+    return value
             
 @app.command()
 def list_feeds(bbox: Annotated[str, typer.Argument(help="pass value as a string separated by commas like this: xmin,ymin,xmax,ymax ")],
-    predicate: Annotated[str, typer.Option(help="intersects or contains")] = 'intersects'):
+    predicate: Annotated[str, typer.Option("--predicate", "-p", help="intersects or contains", case_sensitive=True, callback=check_predicate)] = 'intersects'):
     """Filter feeds spatially based on bounding box."""
+    if ',' not in bbox or len(bbox.split(',')) != 4:
+        LOG.critical(chain.bright_red | "Please pass bbox as a string separated by commas like this: xmin,ymin,xmax,ymax")
+        sys.exit(1)
+    for coord in bbox.split(','):
+        try:
+            float(coord)
+        except ValueError:
+            LOG.critical(chain.bright_red | "Please pass only numbers as bbox values!")
+            sys.exit(1)
     spinner = Halo(text='Filtering...', text_color="cyan", spinner='dots')
     spinner.start()
     xmin, ymin, xmax, ymax = [float(coord) for coord in bbox.split(',')]
     ptable = ColorTable(['Feed Source', 'Transit URL', 'Bounding Box'], theme=Themes.OCEAN)
     for src in feed_sources:
         inst = src()
-        feed_xmin, feed_ymin, feed_xmax, feed_ymax = inst.bbox
+        feed_bbox = inst.bbox
+        feed_xmin, feed_ymin, feed_xmax, feed_ymax = feed_bbox
         if predicate == 'contains':
             if (feed_xmin >= xmin and feed_xmin < xmax) and (feed_ymin >= ymin and feed_ymin < ymax) and (feed_xmax <= xmax and feed_xmax > xmin) and (feed_ymax <= ymax and feed_ymax > ymin):
-                row=[src, chain.bright_yellow | inst.url , bbox ]
+                row=[src, chain.bright_yellow | inst.url , feed_bbox ]
                 ptable.add_row(row)
         else:
             # intersects
             if (feed_xmin >= xmin and feed_xmin <= xmax) or (feed_ymin >= ymin and feed_ymin <= ymax) or (feed_xmax <= xmax and feed_xmax >= xmin) or (feed_ymax <= ymax and feed_ymax >= ymin) or (xmin >= feed_xmin and xmin <= feed_xmax) or (ymin >= feed_ymin and ymin <= feed_ymax) or (xmax <= feed_xmax and xmax >= feed_xmin) or (ymax <= feed_ymax and ymax >= feed_ymin):
-                row=[src, chain.bright_yellow | inst.url , bbox ]
+                row=[src, chain.bright_yellow | inst.url , feed_bbox ]
                 ptable.add_row(row)
     print("\n" + f"Feeds based on bbox input {chain.bright_yellow | [xmin, ymin, xmax, ymax]} are as follows:")     
     print("\n" + ptable.get_string())
     spinner.succeed(chain.bright_green.bold | "All done!")
-
 @app.command()
 def fetch_feeds(sources=None):
     """
