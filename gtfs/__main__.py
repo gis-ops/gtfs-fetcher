@@ -1,36 +1,40 @@
 #!/usr/bin/env python
 """Command line interface for fetching GTFS."""
 import typer
+from typing_extensions import Annotated
 from chalky import chain
 import logging
-from prettytable import PrettyTable
+from prettytable.colortable import ColorTable, Themes
 from halo import Halo
-import importlib
-from utils.FeedSource import FeedSource
-import feed_sources
+from .feed_source import FeedSource
+from .feed_sources import __all__ as feed_sources
 
 logging.basicConfig()
 LOG = logging.getLogger()
 LOG.setLevel(logging.INFO)
 app = typer.Typer()
-sources = list(feed_sources.__all__)
             
 @app.command()
-def list_feeds(xmin:float, ymin:float, xmax:float, ymax:float):
-    """Filter feeds spatially based on bounding box. Pass negative args as ' -45.6774' for example."""
+def list_feeds(bbox: Annotated[str, typer.Argument(help="pass value as a string separated by commas like this: xmin,ymin,xmax,ymax ")],
+    predicate: Annotated[str, typer.Option(help="intersects or contains")] = 'intersects'):
+    """Filter feeds spatially based on bounding box."""
     spinner = Halo(text='Filtering...', text_color="cyan", spinner='dots')
     spinner.start()
-    ptable = PrettyTable(['Transit URL', 'Bounding Box'])
-    
-    for src in sources:
-        module = importlib.import_module('feed_sources.' + src)
-        klass = getattr(module, src)
-        inst = klass()
-        bbox = inst.bbox
-        if (bbox[0] >= xmin and bbox[0] < xmax) and (bbox[1] >= ymin and bbox[1] < ymax) and (bbox[2] <= xmax and bbox[2] > xmin) and (bbox[3] <= ymax and bbox[3] > ymin):
-            row=[ chain.bright_yellow | inst.url , bbox ]
-            ptable.add_row(row)
-    print(f"\n Feeds based on bbox input {chain.bright_yellow | [xmin, ymin, xmax, ymax]} are as follows:")     
+    xmin, ymin, xmax, ymax = [float(coord) for coord in bbox.split(',')]
+    ptable = ColorTable(['Feed Source', 'Transit URL', 'Bounding Box'], theme=Themes.OCEAN)
+    for src in feed_sources:
+        inst = src()
+        feed_xmin, feed_ymin, feed_xmax, feed_ymax = inst.bbox
+        if predicate == 'contains':
+            if (feed_xmin >= xmin and feed_xmin < xmax) and (feed_ymin >= ymin and feed_ymin < ymax) and (feed_xmax <= xmax and feed_xmax > xmin) and (feed_ymax <= ymax and feed_ymax > ymin):
+                row=[src, chain.bright_yellow | inst.url , bbox ]
+                ptable.add_row(row)
+        else:
+            # intersects
+            if (feed_xmin >= xmin and feed_xmin <= xmax) or (feed_ymin >= ymin and feed_ymin <= ymax) or (feed_xmax <= xmax and feed_xmax >= xmin) or (feed_ymax <= ymax and feed_ymax >= ymin) or (xmin >= feed_xmin and xmin <= feed_xmax) or (ymin >= feed_ymin and ymin <= feed_ymax) or (xmax <= feed_xmax and xmax >= feed_xmin) or (ymax <= feed_ymax and ymax >= feed_ymin):
+                row=[src, chain.bright_yellow | inst.url , bbox ]
+                ptable.add_row(row)
+    print("\n" + f"Feeds based on bbox input {chain.bright_yellow | [xmin, ymin, xmax, ymax]} are as follows:")     
     print("\n" + ptable.get_string())
     spinner.succeed(chain.bright_green.bold | "All done!")
 
@@ -67,7 +71,7 @@ def fetch_feeds(sources=None):
         del statuses['last_check']
 
     # display results
-    ptable = PrettyTable()
+    ptable = ColorTable()
 
     for file_name in statuses:
         stat = statuses[file_name]

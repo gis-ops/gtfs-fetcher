@@ -21,20 +21,31 @@ maintainers = [
 ]
 
 dependencies = [
-"beautifulsoup4 = 4.6.3",
-"cffi = 1.11.5",
-"cryptography = 3.2",
-"enum34 = 1.1.6",
-"ndg-httpsclient = 0.5.1",
-"prettytable = 0.7.2",
-"pyasn1 = 0.4.4",
-"pycparser = 2.19",
-"pyOpenSSL = 18.0.0",
-"pytz = 2018.7",
-"requests = 2.20.0",
-"six = 1.11.0",
-"transitfeed = 1.2.16",
-"typer[all] = 0.9.0",
-"chalky==1.0.0",
-"halo==0.0.29"
+"beautifulsoup4 >= 4.6.3, < 5.0.0",
+"cffi >= 1.11.5, < 2.0.0",
+"cryptography >= 3.0.0, < 4.0.0",
+"enum34 >= 1.1.6, < 2.0.0",
+"ndg-httpsclient >= 0.5.0, < 1.0.0",
+"prettytable >= 3.7.0, < 4.0.0",
+"pyasn1 >= 0.4.4, < 1.0.0",
+"pycparser >= 2.19.0, < 3.0.0",
+"pyOpenSSL >= 18.0.0, < 19.0.0",
+"pytz >= 2018.7, < 2024.0",
+"requests >= 2.22.0, < 3.0.0",
+"six >= 1.11.0, < 2.0.0",
+"transitfeed >= 1.2.16, < 2.0.0",
+"typer[all] >= 0.9.0, < 1.0.0",
+"chalky >= 1.0.0, < 2.0.0",
+"halo >= 0.0.29, < 0.1.0"
+]
+
+[project.optional-dependencies]
+socks = [ 'PySocks >= 1.5.6, != 1.5.7, < 2' ]
+tests = [
+  'ddt >= 1.2.2, < 2',
+  'pytest < 6',
+  'mock >= 1.0.1, < 4; python_version < "3.4"',
+]
+lint = [
+  "pre-commit >= 2.20.0" 
 ]

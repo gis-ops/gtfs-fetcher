@@ -1,10 +1,7 @@
-"""Import all non-system modules in this directory."""
-import os
-import glob
+"""Import all feed_sources modules."""
 
-MODULES = glob.glob(os.path.dirname(__file__) + '/*.py')
+from .Berlin import Berlin
+from .AlbanyNy import AlbanyNy
 
-__all__ = []
-for module in MODULES:
-    if os.path.isfile(module) and not os.path.basename(module).startswith('_'):
-        __all__.append(os.path.basename(module)[:-3])
+__all__ = [Berlin, AlbanyNy]
+
