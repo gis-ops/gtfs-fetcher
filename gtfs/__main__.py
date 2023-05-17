@@ -1,58 +1,80 @@
 #!/usr/bin/env python
 """Command line interface for fetching GTFS."""
-import typer
-from typing_extensions import Annotated
-from chalky import chain
 import logging
-import sys
-from prettytable.colortable import ColorTable, Themes
+
+import typer
+from chalky import chain
 from halo import Halo
+from prettytable.colortable import ColorTable, Themes
+from typing_extensions import Annotated
+
 from .feed_source import FeedSource
 from .feed_sources import __all__ as feed_sources
+from .utils.constants import Predicate
+from .utils.geom import bbox_contains_bbox, bbox_intersects_bbox
 
 logging.basicConfig()
 LOG = logging.getLogger()
 LOG.setLevel(logging.INFO)
 app = typer.Typer()
 
-def check_predicate(value: str):
-    if value not in ['intersects', 'contains']:
-        raise typer.BadParameter('predicate must be one of intersects or contains')
-    return value
-            
-@app.command()
-def list_feeds(bbox: Annotated[str, typer.Argument(help="pass value as a string separated by commas like this: xmin,ymin,xmax,ymax ")],
-    predicate: Annotated[str, typer.Option("--predicate", "-p", help="intersects or contains", case_sensitive=True, callback=check_predicate)] = 'intersects'):
-    """Filter feeds spatially based on bounding box."""
-    if ',' not in bbox or len(bbox.split(',')) != 4:
-        LOG.critical(chain.bright_red | "Please pass bbox as a string separated by commas like this: xmin,ymin,xmax,ymax")
-        sys.exit(1)
-    for coord in bbox.split(','):
+
+def check_bbox(bbox: str):
+    if "," not in bbox or len(bbox.split(",")) != 4:
+        raise typer.BadParameter(
+            chain.bright_red
+            | "Please pass bbox as a string separated by commas like this: xmin,ymin,xmax,ymax"
+        )
+    for coord in bbox.split(","):
         try:
             float(coord)
         except ValueError:
-            LOG.critical(chain.bright_red | "Please pass only numbers as bbox values!")
-            sys.exit(1)
-    spinner = Halo(text='Filtering...', text_color="cyan", spinner='dots')
+            raise typer.BadParameter(chain.bright_red | "Please pass only numbers as bbox values!")
+    return bbox
+
+
+@app.command()
+def list_feeds(
+    bbox: Annotated[
+        str,
+        typer.Argument(
+            help="pass value as a string separated by commas like this: xmin,ymin,xmax,ymax ",
+            callback=check_bbox,
+        ),
+    ],
+    predicate: Annotated[
+        Predicate,
+        typer.Option(
+            "--predicate",
+            "-p",
+            help="the gtfs feed should intersect or should be contained inside the user's bbox",
+        ),
+    ] = Predicate.intersects,
+):
+    """Filter feeds spatially based on bounding box."""
+    spinner = Halo(text="Filtering...", text_color="cyan", spinner="dots")
     spinner.start()
-    xmin, ymin, xmax, ymax = [float(coord) for coord in bbox.split(',')]
-    ptable = ColorTable(['Feed Source', 'Transit URL', 'Bounding Box'], theme=Themes.OCEAN)
+    user_bbox = [float(coord) for coord in bbox.split(",")]
+    ptable = ColorTable(["Feed Source", "Transit URL", "Bounding Box"], theme=Themes.OCEAN)
     for src in feed_sources:
-        inst = src()
-        feed_bbox = inst.bbox
-        feed_xmin, feed_ymin, feed_xmax, feed_ymax = feed_bbox
-        if predicate == 'contains':
-            if (feed_xmin >= xmin and feed_xmin < xmax) and (feed_ymin >= ymin and feed_ymin < ymax) and (feed_xmax <= xmax and feed_xmax > xmin) and (feed_ymax <= ymax and feed_ymax > ymin):
-                row=[src, chain.bright_yellow | inst.url , feed_bbox ]
+        feed_bbox = src.bbox
+        if predicate == "contains":
+            if bbox_contains_bbox(feed_bbox, user_bbox):
+                row = [src, chain.bright_yellow | src.url, feed_bbox]
                 ptable.add_row(row)
         else:
-            # intersects
-            if (feed_xmin >= xmin and feed_xmin <= xmax) or (feed_ymin >= ymin and feed_ymin <= ymax) or (feed_xmax <= xmax and feed_xmax >= xmin) or (feed_ymax <= ymax and feed_ymax >= ymin) or (xmin >= feed_xmin and xmin <= feed_xmax) or (ymin >= feed_ymin and ymin <= feed_ymax) or (xmax <= feed_xmax and xmax >= feed_xmin) or (ymax <= feed_ymax and ymax >= feed_ymin):
-                row=[src, chain.bright_yellow | inst.url , feed_bbox ]
+            if bbox_intersects_bbox(feed_bbox, user_bbox):
+                row = [src, chain.bright_yellow | src.url, feed_bbox]
                 ptable.add_row(row)
-    print("\n" + f"Feeds based on bbox input {chain.bright_yellow | [xmin, ymin, xmax, ymax]} are as follows:")     
+    print(
+        "\n"
+        + f"Feeds based on bbox input {chain.bright_yellow | user_bbox} and \
+            for predicate={chain.bright_yellow | predicate.value} are as follows:"
+    )
     print("\n" + ptable.get_string())
     spinner.succeed(chain.bright_green.bold | "All done!")
+
+
 @app.command()
 def fetch_feeds(sources=None):
     """
@@ -65,9 +87,9 @@ def fetch_feeds(sources=None):
     if not sources:
         sources = list(feed_sources.__all__)
 
-    LOG.info('Going to fetch feeds from sources: %s', sources)
+    LOG.info("Going to fetch feeds from sources: %s", sources)
     for src in sources:
-        LOG.debug('Going to start fetch for %s...', src)
+        LOG.debug("Going to start fetch for %s...", src)
         try:
             module = getattr(feed_sources, src)
             # expect a class with the same name as the module; instantiate and fetch its feeds
@@ -77,13 +99,16 @@ def fetch_feeds(sources=None):
                 inst.fetch()
                 statuses.update(inst.status)
             else:
-                LOG.warn('Skipping class %s, which does not subclass FeedSource.', klass.__name__)
+                LOG.warn(
+                    "Skipping class %s, which does not subclass FeedSource.",
+                    klass.__name__,
+                )
         except AttributeError:
-            LOG.error('Skipping feed %s, which could not be found.', src)
+            LOG.error("Skipping feed %s, which could not be found.", src)
 
     # remove last check key set at top level of each status dictionary
-    if statuses.has_key('last_check'):
-        del statuses['last_check']
+    if "last_check" in statuses:
+        del statuses["last_check"]
 
     # display results
     ptable = ColorTable()
@@ -92,19 +117,27 @@ def fetch_feeds(sources=None):
         stat = statuses[file_name]
         msg = []
         msg.append(file_name)
-        msg.append('x' if stat.has_key('is_new') and stat['is_new'] else '')
-        msg.append('x' if stat.has_key('is_valid') and stat['is_valid'] else '')
-        msg.append('x' if stat.has_key('is_current') and stat['is_current'] else '')
-        msg.append('x' if stat.has_key('newly_effective') and stat.get('newly_effective') else '')
-        if stat.has_key('error'):
-             msg.append(stat['error'])
+        msg.append("x" if "is_new" in stat and stat["is_new"] else "")
+        msg.append("x" if "is_valid" in stat and stat["is_valid"] else "")
+        msg.append("x" if "is_current" in stat and stat["is_current"] else "")
+        msg.append("x" if "newly_effective" in stat and stat.get("newly_effective") else "")
+        if "error" in stat:
+            msg.append(stat["error"])
         else:
-             msg.append('')
+            msg.append("")
         ptable.add_row(msg)
 
-    ptable.field_names = ['file', 'new?', 'valid?', 'current?', 'newly effective?', 'error']
-    LOG.info('Results:\n%s', ptable.get_string())
-    LOG.info('All done!')
+    ptable.field_names = [
+        "file",
+        "new?",
+        "valid?",
+        "current?",
+        "newly effective?",
+        "error",
+    ]
+    LOG.info("Results:\n%s", ptable.get_string())
+    LOG.info("All done!")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     app()

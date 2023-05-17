@@ -2,8 +2,8 @@
 
 To add a new feed, add a subclass of this to the `feed_sources` directory.
 """
-import logging
-from abc import ABC, abstractmethod, abstractproperty
+from abc import ABC, abstractproperty
+
 
 class FeedSource(ABC):
     """Base class for a GTFS source. Class and module names are expected to match.
@@ -17,7 +17,7 @@ class FeedSource(ABC):
     @abstractproperty
     def url(self):
         pass
-    
+
     @abstractproperty
     def bbox(self):
         pass

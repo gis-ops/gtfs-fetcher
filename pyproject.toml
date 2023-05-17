@@ -38,3 +38,20 @@ tests = [
 lint = [
   "pre-commit >= 2.20.0" 
 ]
+
+[tool.black]
+line-length = 105
+exclude = '''
+/(
+    \.git
+  | \.venv
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 105
+src_paths = ["gtfs"]
+skip = [
+    ".venv"
+]
