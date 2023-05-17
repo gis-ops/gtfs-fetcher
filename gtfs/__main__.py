@@ -11,26 +11,27 @@ from typing_extensions import Annotated
 from .feed_source import FeedSource
 from .feed_sources import __all__ as feed_sources
 from .utils.constants import Predicate
-from .utils.geom import bbox_contains_bbox, bbox_intersects_bbox
+from .utils.geom import Bbox, bbox_contains_bbox, bbox_intersects_bbox
 
-logging.basicConfig()
 LOG = logging.getLogger()
-LOG.setLevel(logging.INFO)
 app = typer.Typer()
 
 
 def check_bbox(bbox: str):
-    if "," not in bbox or len(bbox.split(",")) != 4:
+    if len(bbox.split(",")) != 4:
         raise typer.BadParameter(
             chain.bright_red
-            | "Please pass bbox as a string separated by commas like this: xmin,ymin,xmax,ymax"
+            | "Please pass bbox as a string separated by commas like this: min_x,min_y,max_x,max_y"
         )
-    for coord in bbox.split(","):
-        try:
-            float(coord)
-        except ValueError:
-            raise typer.BadParameter(chain.bright_red | "Please pass only numbers as bbox values!")
-    return bbox
+    try:
+        min_x, min_y, max_x, max_y = [float(coord) for coord in bbox.split(",")]
+    except ValueError:
+        raise typer.BadParameter(chain.bright_red | "Please pass only numbers as bbox values!")
+
+    if min_x == max_x or min_y == max_y:
+        raise typer.BadParameter(chain.bright_red | "Please pass a valid bbox. Area cannot be zero!")
+
+    return Bbox(min_x, min_y, max_x, max_y)
 
 
 @app.command()
@@ -38,7 +39,7 @@ def list_feeds(
     bbox: Annotated[
         str,
         typer.Argument(
-            help="pass value as a string separated by commas like this: xmin,ymin,xmax,ymax ",
+            help="pass value as a string separated by commas like this: min_x,min_y,max_x,max_y",
             callback=check_bbox,
         ),
     ],
@@ -54,22 +55,28 @@ def list_feeds(
     """Filter feeds spatially based on bounding box."""
     spinner = Halo(text="Filtering...", text_color="cyan", spinner="dots")
     spinner.start()
-    user_bbox = [float(coord) for coord in bbox.split(",")]
     ptable = ColorTable(["Feed Source", "Transit URL", "Bounding Box"], theme=Themes.OCEAN)
     for src in feed_sources:
-        feed_bbox = src.bbox
+        feed_bbox: Bbox = src.bbox
         if predicate == "contains":
-            if bbox_contains_bbox(feed_bbox, user_bbox):
-                row = [src, chain.bright_yellow | src.url, feed_bbox]
-                ptable.add_row(row)
-        else:
-            if bbox_intersects_bbox(feed_bbox, user_bbox):
-                row = [src, chain.bright_yellow | src.url, feed_bbox]
-                ptable.add_row(row)
+            if not bbox_contains_bbox(feed_bbox, bbox):
+                continue
+        elif predicate == "intersects":
+            if (not bbox_intersects_bbox(feed_bbox, bbox)) and (
+                not bbox_intersects_bbox(bbox, feed_bbox)
+            ):
+                continue
+
+        row = [
+            src.__name__,
+            chain.bright_yellow | src.url,
+            feed_bbox,
+        ]
+        ptable.add_row(row)
+
     print(
-        "\n"
-        + f"Feeds based on bbox input {chain.bright_yellow | user_bbox} and \
-            for predicate={chain.bright_yellow | predicate.value} are as follows:"
+        "\n" + f"Feeds based on bbox input {chain.bright_yellow | bbox} and "
+        f"for predicate={chain.bright_yellow | predicate.value} are as follows:"
     )
     print("\n" + ptable.get_string())
     spinner.succeed(chain.bright_green.bold | "All done!")
