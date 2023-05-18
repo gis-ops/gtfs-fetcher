@@ -1,15 +1,10 @@
 """Fetch Capital District Transportation Authority (Albany, New York) feed."""
-import logging
-
-from gtfs.utils.FeedSource import FeedSource
-
-URL = 'http://www.cdta.org/schedules/google_transit.zip'
-
-LOG = logging.getLogger(__name__)
+from ..feed_source import FeedSource
+from ..utils.geom import Bbox
 
 
 class AlbanyNy(FeedSource):
     """Fetch CDTA feed."""
-    def __init__(self):
-        super(AlbanyNy, self).__init__()
-        self.urls = {'albany_ny.zip': URL}
+
+    url: str = "http://www.cdta.org/schedules/google_transit.zip"
+    bbox: Bbox = Bbox(-74.219321, 42.467161, -73.614608, 43.10706)
