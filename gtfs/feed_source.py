@@ -2,7 +2,9 @@
 
 To add a new feed, add a subclass of this to the `feed_sources` directory.
 """
-from abc import ABC, abstractproperty
+from abc import ABC, abstractmethod
+
+from gtfs.utils.geom import Bbox
 
 
 class FeedSource(ABC):
@@ -14,12 +16,14 @@ class FeedSource(ABC):
         - override :fetch: method as necessary to fetch feeds for the agency.
     """
 
-    @abstractproperty
-    def url(self):
+    @property
+    @abstractmethod
+    def url(self) -> str:
         pass
 
-    @abstractproperty
-    def bbox(self):
+    @property
+    @abstractmethod
+    def bbox(self) -> Bbox:
         pass
 
     def fetch(self):
