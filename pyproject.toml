@@ -6,32 +6,32 @@ requires = [
 ]
 build-backend = "setuptools.build_meta"
 
-[project]
+[tool.poetry]
 name = "gtfs-fetcher"
 version = "0.1.0"
 description = "Download, validate, and manage GTFS transit feeds"
-readme = "README.rst"
-requires-python = ">=3.10"
-license = {file = "LICENSE.txt"}
-authors = [
-  {email = "nils@gis-ops.com"}
-]
-maintainers = [
-  {name = "Nils Nolde", email = "nils@gis-ops.com"}
-]
+authors = ["Nils Nolde <nils@gis-ops.com>"]
+license = "MIT"
+readme = 'README.md'
 
-dependencies = [
-"prettytable >= 3.7.0, < 4.0.0",
-"requests >= 2.22.0, < 3.0.0",
-"typer[all] >= 0.9.0, < 1.0.0",
-"chalky >= 1.0.0, < 2.0.0",
-"halo >= 0.0.29, < 0.1.0"
-]
+[tool.poetry.dependencies]
+python = "^3.7.0"
+requests = "^2.22.0"
+typer = { version = "^0.9.0", extras = ["all"] }
+prettytable = "^3.7.0"
+halo = "^0.0.29"
 
-[project.optional-dependencies]
-tests = [
-  'pytest < 8',
-]
+[tool.poetry.dev-dependencies]
+pytest = "<8"
+mypy = "^1.3.0"
+pre-commit = "^2.20.0"
+
+[tool.setuptools_scm]
+write_to = "gtfs/__version__.py"
+write_to_template = """
+__version__ = "{version}"
+"""
+version_scheme = "post-release"
 
 [tool.black]
 line-length = 105

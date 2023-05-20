@@ -3,7 +3,6 @@
 import logging
 
 import typer
-from chalky import chain
 from halo import Halo
 from prettytable.colortable import ColorTable, Themes
 from typing_extensions import Annotated
@@ -17,19 +16,19 @@ LOG = logging.getLogger()
 app = typer.Typer()
 
 
-def check_bbox(bbox: str):
-    if len(bbox.split(",")) != 4:
-        raise typer.BadParameter(
-            chain.bright_red
-            | "Please pass bbox as a string separated by commas like this: min_x,min_y,max_x,max_y"
-        )
+def check_bbox(bbox: str) -> Bbox:
     try:
         min_x, min_y, max_x, max_y = [float(coord) for coord in bbox.split(",")]
-    except ValueError:
-        raise typer.BadParameter(chain.bright_red | "Please pass only numbers as bbox values!")
+    except ValueError as e:
+        if "could not convert" in e.args[0]:
+            raise typer.BadParameter("Please pass only numbers as bbox values!")
+        elif "not enough values to unpack" in e.args[0]:
+            raise typer.BadParameter(
+                "Please pass bbox as a string separated by commas like this: min_x,min_y,max_x,max_y"
+            )
 
     if min_x == max_x or min_y == max_y:
-        raise typer.BadParameter(chain.bright_red | "Please pass a valid bbox. Area cannot be zero!")
+        raise typer.BadParameter("Area cannot be zero! Please pass a valid bbox.")
 
     return Bbox(min_x, min_y, max_x, max_y)
 
@@ -51,7 +50,7 @@ def list_feeds(
             help="the gtfs feed should intersect or should be contained inside the user's bbox",
         ),
     ] = Predicate.intersects,
-):
+) -> None:
     """Filter feeds spatially based on bounding box."""
     spinner = Halo(text="Filtering...", text_color="cyan", spinner="dots")
     spinner.start()
@@ -69,17 +68,17 @@ def list_feeds(
 
         row = [
             src.__name__,
-            chain.bright_yellow | src.url,
-            feed_bbox,
+            src.url,
+            [feed_bbox.min_x, feed_bbox.min_y, feed_bbox.max_x, feed_bbox.max_y],
         ]
         ptable.add_row(row)
 
     print(
-        "\n" + f"Feeds based on bbox input {chain.bright_yellow | bbox} and "
-        f"for predicate={chain.bright_yellow | predicate.value} are as follows:"
+        "\n" + f"Feeds based on bbox input {bbox} and "
+        f"for predicate={predicate.value} are as follows:"
     )
     print("\n" + ptable.get_string())
-    spinner.succeed(chain.bright_green.bold | "All done!")
+    spinner.succeed("All done!")
 
 
 @app.command()
