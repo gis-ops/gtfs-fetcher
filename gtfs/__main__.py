@@ -20,9 +20,10 @@ def check_bbox(bbox: str) -> Bbox:
     try:
         min_x, min_y, max_x, max_y = [float(coord) for coord in bbox.split(",")]
     except ValueError as e:
-        if "could not convert" in e.args[0]:
+        err_message = e.args[0]
+        if "could not convert" in err_message:
             raise typer.BadParameter("Please pass only numbers as bbox values!")
-        elif "not enough values to unpack" in e.args[0]:
+        elif "not enough values to unpack" in err_message:
             raise typer.BadParameter(
                 "Please pass bbox as a string separated by commas like this: min_x,min_y,max_x,max_y"
             )

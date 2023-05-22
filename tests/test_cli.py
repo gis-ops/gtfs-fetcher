@@ -10,6 +10,11 @@ def runner():
 
 
 class Test_List_Feeds_Command:
+    def test_help(self, runner):
+        result = runner.invoke(app, ["list-feeds", "--help"])
+        assert result.exit_code == 0
+        assert "Filter feeds spatially based on bounding box." in result.stdout
+
     def test_bad_args_1(self, runner):
         result = runner.invoke(app, ["list-feeds", "6.626953,49.423342,23.348144"])
         assert result.exit_code == 2
