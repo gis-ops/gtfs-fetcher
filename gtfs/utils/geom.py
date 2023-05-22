@@ -9,6 +9,8 @@ def bbox_contains_bbox(bbox1: Bbox, bbox2: Bbox) -> bool:
         bbox1.max_y <= bbox2.max_y and bbox1.min_y >= bbox2.min_y
     ):
         return True
+    else:
+        return False
 
 
 def bbox_intersects_bbox(bbox1: Bbox, bbox2: Bbox) -> bool:

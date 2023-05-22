@@ -10,7 +10,7 @@ build-backend = "setuptools.build_meta"
 name = "gtfs-fetcher"
 version = "0.1.0"
 description = "Download, validate, and manage GTFS transit feeds"
-authors = ["Nils Nolde <nils@gis-ops.com>"]
+authors = ["Ananya Nayak <ananyanayak102@gmail.com>", "Nils Nolde <nils@gis-ops.com>"]
 license = "MIT"
 readme = 'README.md'
 
@@ -22,9 +22,7 @@ prettytable = "^3.7.0"
 halo = "^0.0.29"
 
 [tool.poetry.dev-dependencies]
-pytest = "<8"
-mypy = "^1.3.0"
-pre-commit = "^2.20.0"
+pytest = "^7.0.0"
 
 [tool.setuptools_scm]
 write_to = "gtfs/__version__.py"
@@ -48,4 +46,20 @@ line_length = 105
 src_paths = ["gtfs"]
 skip = [
     ".venv"
+]
+
+[tool.mypy]
+strict_optional = true
+warn_return_any = true
+warn_redundant_casts = true
+check_untyped_defs = true
+disallow_any_generics = true
+no_implicit_optional = true
+warn_unused_configs = true
+show_error_codes = true
+show_column_numbers = true
+exclude = [
+    '\.git',
+    '__pycache__',
+    'venv/',
 ]
