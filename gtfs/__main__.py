@@ -3,15 +3,15 @@
 import logging
 
 import typer
-from halo import Halo
 from prettytable.colortable import ColorTable, Themes
 from typing_extensions import Annotated
 
 from .feed_source import FeedSource
 from .feed_sources import __all__ as feed_sources
-from .utils.constants import Predicate
+from .utils.constants import Predicate, console, spinner, success
 from .utils.geom import Bbox, bbox_contains_bbox, bbox_intersects_bbox
 
+logging.basicConfig()
 LOG = logging.getLogger()
 app = typer.Typer()
 
@@ -53,8 +53,7 @@ def list_feeds(
     ] = Predicate.intersects,
 ) -> None:
     """Filter feeds spatially based on bounding box."""
-    spinner = Halo(text="Filtering...", text_color="cyan", spinner="dots")
-    spinner.start()
+    spinner("Fetching feeds...", 1)
     ptable = ColorTable(["Feed Source", "Transit URL", "Bounding Box"], theme=Themes.OCEAN)
     for src in feed_sources:
         feed_bbox: Bbox = src.bbox
@@ -79,7 +78,7 @@ def list_feeds(
         f"for predicate={predicate.value} are as follows:"
     )
     print("\n" + ptable.get_string())
-    spinner.succeed("All done!")
+    console.print("All done!", style=success)
 
 
 @app.command()
