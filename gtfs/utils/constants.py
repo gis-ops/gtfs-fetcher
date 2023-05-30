@@ -16,7 +16,7 @@ success = Style(color="green", bold=True)
 console = Console()
 
 
-def spinner(text: str, timer: int) -> Progress:
+def spinner(text: str, timer: int) -> None:
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),

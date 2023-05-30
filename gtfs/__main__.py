@@ -27,6 +27,8 @@ def check_bbox(bbox: str) -> Bbox:
             raise typer.BadParameter(
                 "Please pass bbox as a string separated by commas like this: min_x,min_y,max_x,max_y"
             )
+        else:
+            raise typer.BadParameter(f"Unhandled exception: {e}")
 
     if min_x == max_x or min_y == max_y:
         raise typer.BadParameter("Area cannot be zero! Please pass a valid bbox.")
@@ -38,7 +40,9 @@ def check_bbox(bbox: str) -> Bbox:
 def list_feeds(
     bbox: Annotated[
         str,
-        typer.Argument(
+        typer.Option(
+            "--bbox",
+            "-b",
             help="pass value as a string separated by commas like this: min_x,min_y,max_x,max_y",
             callback=check_bbox,
         ),

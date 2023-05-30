@@ -9,35 +9,35 @@ def runner():
     return CliRunner()
 
 
-class Test_List_Feeds_Command:
+class TestListFeedsCommand:
     def test_help(self, runner):
         result = runner.invoke(app, ["list-feeds", "--help"])
         assert result.exit_code == 0
         assert "Filter feeds spatially based on bounding box." in result.stdout
 
     def test_bad_args_1(self, runner):
-        result = runner.invoke(app, ["list-feeds", "6.626953,49.423342,23.348144"])
+        result = runner.invoke(app, ["list-feeds", "--bbox", "6.626953,49.423342,23.348144"])
         assert result.exit_code == 2
         assert "Please pass bbox as a string" in result.stdout
 
     def test_bad_args_2(self, runner):
-        result = runner.invoke(app, ["list-feeds", "6.626953,49.423342,23.348144,fourteen"])
+        result = runner.invoke(app, ["list-feeds", "--bbox", "6.626953,49.423342,23.348144,fourteen"])
         assert result.exit_code == 2
         assert "Please pass only numbers as bbox values!" in result.stdout
 
     def test_bad_args_3(self, runner):
-        result = runner.invoke(app, ["list-feeds", "6.626953,49.423342,6.626953,54.265953"])
+        result = runner.invoke(app, ["list-feeds", "--bbox", "6.626953,49.423342,6.626953,54.265953"])
         assert result.exit_code == 2
         assert "Area cannot be zero!" in result.stdout
 
     def test_intersects_predicate(self, runner):
-        result = runner.invoke(app, ["list-feeds", "6.626953,49.423342,23.348144,54.265953"])
+        result = runner.invoke(app, ["list-feeds", "--bbox", "6.626953,49.423342,23.348144,54.265953"])
         assert result.exit_code == 0
         assert "Feeds based on bbox input" in result.stdout
 
     def test_contains_predicate(self, runner):
         result = runner.invoke(
-            app, ["list-feeds", "-p", "contains", "6.626953,49.423342,23.348144,54.265953"]
+            app, ["list-feeds", "-p", "contains", "--bbox", "6.626953,49.423342,23.348144,54.265953"]
         )
         assert result.exit_code == 0
         assert "Feeds based on bbox input" in result.stdout

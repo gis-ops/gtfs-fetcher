@@ -3,7 +3,7 @@ import pytest
 from gtfs.utils.geom import Bbox, bbox_contains_bbox, bbox_intersects_bbox
 
 
-class Test_Geom_Functions:
+class TestGeomFunctions:
     @pytest.mark.parametrize(
         # 1. bbox1 is covering bbox2;
         # 2. bbox1 is contained in bbox2;
