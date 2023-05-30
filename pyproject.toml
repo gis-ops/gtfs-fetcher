@@ -1,37 +1,30 @@
 [build-system]
-requires = [
-    "setuptools>=45",
-    "wheel",
-    "setuptools_scm>=6.2",
-]
-build-backend = "setuptools.build_meta"
+requires = ["poetry>=1.1.13"]
+build-backend = "poetry.masonry.api"
 
-[project]
+[tool.poetry]
 name = "gtfs-fetcher"
 version = "0.1.0"
 description = "Download, validate, and manage GTFS transit feeds"
-readme = "README.rst"
-requires-python = ">=3.10"
-license = {file = "LICENSE.txt"}
-authors = [
-  {email = "nils@gis-ops.com"}
-]
-maintainers = [
-  {name = "Nils Nolde", email = "nils@gis-ops.com"}
-]
+authors = ["Ananya Nayak <ananyanayak102@gmail.com>", "Nils Nolde <nils@gis-ops.com>"]
+license = "MIT"
+readme = 'README.md'
 
-dependencies = [
-"prettytable >= 3.7.0, < 4.0.0",
-"requests >= 2.22.0, < 3.0.0",
-"typer[all] >= 0.9.0, < 1.0.0",
-"chalky >= 1.0.0, < 2.0.0",
-"halo >= 0.0.29, < 0.1.0"
-]
+[tool.poetry.dependencies]
+python = "^3.7.0"
+requests = "^2.22.0"
+typer = { version = "^0.9.0", extras = ["all"] }
+prettytable = "^3.7.0"
 
-[project.optional-dependencies]
-tests = [
-  'pytest < 8',
-]
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.0.0"
+
+[tool.setuptools_scm]
+write_to = "gtfs/__version__.py"
+write_to_template = """
+__version__ = "{version}"
+"""
+version_scheme = "post-release"
 
 [tool.black]
 line-length = 105
@@ -48,4 +41,20 @@ line_length = 105
 src_paths = ["gtfs"]
 skip = [
     ".venv"
+]
+
+[tool.mypy]
+strict_optional = true # no implicit Optional[Any] for None
+warn_return_any = true # if return type is any for a function
+warn_redundant_casts = true # if a cast to a type is unnecessary
+check_untyped_defs = true # warn if a function was not annotated with types
+disallow_any_generics = true # warn if generics are used
+no_implicit_optional = true # warn on non-optional usage of variables initialized as None
+warn_unused_configs = true # warn on unused imports
+show_error_codes = true # show error codes in error messages
+show_column_numbers = true # show column numbers in error messages
+exclude = [
+    '\.git',
+    '__pycache__',
+    'venv/',
 ]
