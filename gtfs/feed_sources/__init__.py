@@ -3,4 +3,4 @@
 from .AlbanyNy import AlbanyNy
 from .Berlin import Berlin
 
-__all__ = [Berlin, AlbanyNy]
+feed_sources = [Berlin, AlbanyNy]

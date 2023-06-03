@@ -1,14 +1,15 @@
 #!/usr/bin/env python
 """Command line interface for fetching GTFS."""
 import logging
+from typing import Union
 
 import typer
 from prettytable.colortable import ColorTable, Themes
 from typing_extensions import Annotated
 
 from .feed_source import FeedSource
-from .feed_sources import __all__ as feed_sources
-from .utils.constants import Predicate, console, spinner, success
+from .feed_sources import feed_sources
+from .utils.constants import Predicate, spinner
 from .utils.geom import Bbox, bbox_contains_bbox, bbox_intersects_bbox
 
 logging.basicConfig()
@@ -16,7 +17,9 @@ LOG = logging.getLogger()
 app = typer.Typer()
 
 
-def check_bbox(bbox: str) -> Bbox:
+def check_bbox(bbox: str) -> Union[Bbox, None]:
+    if bbox is None:
+        return
     try:
         min_x, min_y, max_x, max_y = [float(coord) for coord in bbox.split(",")]
     except ValueError as e:
@@ -39,50 +42,76 @@ def check_bbox(bbox: str) -> Bbox:
 @app.command()
 def list_feeds(
     bbox: Annotated[
-        str,
+        Union[str, None],
         typer.Option(
             "--bbox",
             "-b",
             help="pass value as a string separated by commas like this: min_x,min_y,max_x,max_y",
             callback=check_bbox,
         ),
-    ],
+    ] = None,
     predicate: Annotated[
-        Predicate,
+        Union[Predicate, None],
         typer.Option(
             "--predicate",
-            "-p",
+            "-pd",
             help="the gtfs feed should intersect or should be contained inside the user's bbox",
         ),
-    ] = Predicate.intersects,
+    ] = None,
+    pretty: Annotated[
+        bool,
+        typer.Option(
+            "--pretty",
+            "-pt",
+            help="display feeds inside a pretty table",
+        ),
+    ] = False,
 ) -> None:
     """Filter feeds spatially based on bounding box."""
-    spinner("Fetching feeds...", 1)
-    ptable = ColorTable(["Feed Source", "Transit URL", "Bounding Box"], theme=Themes.OCEAN)
-    for src in feed_sources:
-        feed_bbox: Bbox = src.bbox
-        if predicate == "contains":
-            if not bbox_contains_bbox(feed_bbox, bbox):
-                continue
-        elif predicate == "intersects":
-            if (not bbox_intersects_bbox(feed_bbox, bbox)) and (
-                not bbox_intersects_bbox(bbox, feed_bbox)
-            ):
-                continue
+    if bbox is None and predicate is not None:
+        raise typer.BadParameter(
+            f"Please pass a bbox if you want to filter feeds spatially based on predicate = {predicate}!"
+        )
+    elif bbox is not None and predicate is None:
+        raise typer.BadParameter(
+            f"Please pass a predicate if you want to filter feeds spatially based on bbox = {bbox}!"
+        )
+    else:
+        spinner("Fetching feeds...", 1)
+        typer.secho("Filtered feeds are:", fg=typer.colors.BLUE)
+        if pretty is True:
+            output = ColorTable(
+                ["Feed Source", "Transit URL", "Bounding Box"], theme=Themes.OCEAN, hrules=1
+            )
+        else:
+            output = []
 
-        row = [
-            src.__name__,
-            src.url,
-            [feed_bbox.min_x, feed_bbox.min_y, feed_bbox.max_x, feed_bbox.max_y],
-        ]
-        ptable.add_row(row)
+        for src in feed_sources:
+            feed_bbox: Bbox = src.bbox
+            if bbox is not None and predicate == "contains":
+                if not bbox_contains_bbox(feed_bbox, bbox):
+                    continue
+            elif bbox is not None and predicate == "intersects":
+                if (not bbox_intersects_bbox(feed_bbox, bbox)) and (
+                    not bbox_intersects_bbox(bbox, feed_bbox)
+                ):
+                    continue
 
-    print(
-        "\n" + f"Feeds based on bbox input {bbox} and "
-        f"for predicate={predicate.value} are as follows:"
-    )
-    print("\n" + ptable.get_string())
-    console.print("All done!", style=success)
+            if pretty is True:
+                row = [
+                    src.__name__,
+                    src.url,
+                    [feed_bbox.min_x, feed_bbox.min_y, feed_bbox.max_x, feed_bbox.max_y],
+                ]
+                output.add_row(row)
+            else:
+                output.append(src.url)
+
+        if pretty is True:
+            print("\n" + output.get_string())
+        else:
+            print("\n".join(output))
+        typer.secho("All done!", fg=typer.colors.GREEN)
 
 
 @app.command()
@@ -95,7 +124,7 @@ def fetch_feeds(sources=None):
     # make a copy of the list of all modules in feed_sources;
     # default to use all of them
     if not sources:
-        sources = list(feed_sources.__all__)
+        sources = list(feed_sources)
 
     LOG.info("Going to fetch feeds from sources: %s", sources)
     for src in sources:

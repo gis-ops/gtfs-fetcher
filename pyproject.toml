@@ -44,6 +44,7 @@ skip = [
 ]
 
 [tool.mypy]
+ignore_missing_imports = true # allow imports of non-typed libraries
 strict_optional = true # no implicit Optional[Any] for None
 warn_return_any = true # if return type is any for a function
 warn_redundant_casts = true # if a cast to a type is unnecessary

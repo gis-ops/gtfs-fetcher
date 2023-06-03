@@ -31,13 +31,20 @@ class TestListFeedsCommand:
         assert "Area cannot be zero!" in result.stdout
 
     def test_intersects_predicate(self, runner):
-        result = runner.invoke(app, ["list-feeds", "--bbox", "6.626953,49.423342,23.348144,54.265953"])
+        result = runner.invoke(
+            app, ["list-feeds", "-pd", "intersects", "--bbox", "6.626953,49.423342,23.348144,54.265953"]
+        )
         assert result.exit_code == 0
-        assert "Feeds based on bbox input" in result.stdout
+        assert "Filtered feeds are:" in result.stdout
 
     def test_contains_predicate(self, runner):
         result = runner.invoke(
-            app, ["list-feeds", "-p", "contains", "--bbox", "6.626953,49.423342,23.348144,54.265953"]
+            app, ["list-feeds", "-pd", "contains", "--bbox", "6.626953,49.423342,23.348144,54.265953"]
         )
         assert result.exit_code == 0
-        assert "Feeds based on bbox input" in result.stdout
+        assert "Filtered feeds are:" in result.stdout
+
+    def test_pretty(self, runner):
+        result = runner.invoke(app, ["list-feeds", "-pt"])
+        assert result.exit_code == 0
+        assert "Filtered feeds are:" in result.stdout
