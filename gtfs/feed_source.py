@@ -27,4 +27,9 @@ class FeedSource(ABC):
         pass
 
     def fetch(self):
-        pass
+        """
+        Modify this method in subclass for importing feed(s) from agency.
+
+        By default, loops over given URLs, checks the last-modified header to see if a new
+        download is available, streams the download if so, and verifies the new GTFS.
+        """

@@ -35,16 +35,13 @@ class TestListFeedsCommand:
             app, ["list-feeds", "-pd", "intersects", "--bbox", "6.626953,49.423342,23.348144,54.265953"]
         )
         assert result.exit_code == 0
-        assert "Filtered feeds are:" in result.stdout
 
     def test_contains_predicate(self, runner):
         result = runner.invoke(
             app, ["list-feeds", "-pd", "contains", "--bbox", "6.626953,49.423342,23.348144,54.265953"]
         )
         assert result.exit_code == 0
-        assert "Filtered feeds are:" in result.stdout
 
     def test_pretty(self, runner):
         result = runner.invoke(app, ["list-feeds", "-pt"])
         assert result.exit_code == 0
-        assert "Filtered feeds are:" in result.stdout

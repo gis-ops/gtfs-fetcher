@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Command line interface for fetching GTFS."""
 import logging
-from typing import Union
+from typing import Optional
 
 import typer
 from prettytable.colortable import ColorTable, Themes
@@ -17,7 +17,7 @@ LOG = logging.getLogger()
 app = typer.Typer()
 
 
-def check_bbox(bbox: str) -> Union[Bbox, None]:
+def check_bbox(bbox: str) -> Optional[Bbox]:
     if bbox is None:
         return
     try:
@@ -42,7 +42,7 @@ def check_bbox(bbox: str) -> Union[Bbox, None]:
 @app.command()
 def list_feeds(
     bbox: Annotated[
-        Union[str, None],
+        Optional[str],
         typer.Option(
             "--bbox",
             "-b",
@@ -51,7 +51,7 @@ def list_feeds(
         ),
     ] = None,
     predicate: Annotated[
-        Union[Predicate, None],
+        Optional[Predicate],
         typer.Option(
             "--predicate",
             "-pd",
@@ -78,13 +78,10 @@ def list_feeds(
         )
     else:
         spinner("Fetching feeds...", 1)
-        typer.secho("Filtered feeds are:", fg=typer.colors.BLUE)
         if pretty is True:
-            output = ColorTable(
+            pretty_output = ColorTable(
                 ["Feed Source", "Transit URL", "Bounding Box"], theme=Themes.OCEAN, hrules=1
             )
-        else:
-            output = []
 
         for src in feed_sources:
             feed_bbox: Bbox = src.bbox
@@ -98,20 +95,19 @@ def list_feeds(
                     continue
 
             if pretty is True:
-                row = [
-                    src.__name__,
-                    src.url,
-                    [feed_bbox.min_x, feed_bbox.min_y, feed_bbox.max_x, feed_bbox.max_y],
-                ]
-                output.add_row(row)
-            else:
-                output.append(src.url)
+                pretty_output.add_row(
+                    [
+                        src.__name__,
+                        src.url,
+                        [feed_bbox.min_x, feed_bbox.min_y, feed_bbox.max_x, feed_bbox.max_y],
+                    ]
+                )
+                continue
+
+            print(src.url)
 
         if pretty is True:
-            print("\n" + output.get_string())
-        else:
-            print("\n".join(output))
-        typer.secho("All done!", fg=typer.colors.GREEN)
+            print("\n" + pretty_output.get_string())
 
 
 @app.command()
@@ -121,26 +117,22 @@ def fetch_feeds(sources=None):
     """
     statuses = {}  # collect the statuses for all the files
 
-    # make a copy of the list of all modules in feed_sources;
     # default to use all of them
     if not sources:
-        sources = list(feed_sources)
+        sources = feed_sources
 
     LOG.info("Going to fetch feeds from sources: %s", sources)
     for src in sources:
         LOG.debug("Going to start fetch for %s...", src)
         try:
-            module = getattr(feed_sources, src)
-            # expect a class with the same name as the module; instantiate and fetch its feeds
-            klass = getattr(module, src)
-            if issubclass(klass, FeedSource):
-                inst = klass()
+            if issubclass(src, FeedSource):
+                inst = src()
                 inst.fetch()
                 statuses.update(inst.status)
             else:
-                LOG.warn(
+                LOG.warning(
                     "Skipping class %s, which does not subclass FeedSource.",
-                    klass.__name__,
+                    src.__name__,
                 )
         except AttributeError:
             LOG.error("Skipping feed %s, which could not be found.", src)
@@ -149,8 +141,18 @@ def fetch_feeds(sources=None):
     if "last_check" in statuses:
         del statuses["last_check"]
 
-    # display results
-    ptable = ColorTable()
+    ptable = ColorTable(
+        [
+            "file",
+            "new?",
+            "valid?",
+            "current?",
+            "newly effective?",
+            "error",
+        ],
+        theme=Themes.OCEAN,
+        hrules=1,
+    )
 
     for file_name in statuses:
         stat = statuses[file_name]
@@ -166,14 +168,6 @@ def fetch_feeds(sources=None):
             msg.append("")
         ptable.add_row(msg)
 
-    ptable.field_names = [
-        "file",
-        "new?",
-        "valid?",
-        "current?",
-        "newly effective?",
-        "error",
-    ]
     LOG.info("Results:\n%s", ptable.get_string())
     LOG.info("All done!")
 
