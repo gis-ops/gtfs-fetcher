@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Command line interface for fetching GTFS."""
-import logging
+import os.path
 from typing import Optional
 
 import typer
@@ -9,11 +9,9 @@ from typing_extensions import Annotated
 
 from .feed_source import FeedSource
 from .feed_sources import feed_sources
-from .utils.constants import Predicate, spinner
+from .utils.constants import LOG, Predicate, spinner
 from .utils.geom import Bbox, bbox_contains_bbox, bbox_intersects_bbox
 
-logging.basicConfig()
-LOG = logging.getLogger()
 app = typer.Typer()
 
 
@@ -67,7 +65,12 @@ def list_feeds(
         ),
     ] = False,
 ) -> None:
-    """Filter feeds spatially based on bounding box."""
+    """Filter feeds spatially based on bounding box or list all of them.
+
+    :param bbox: set of coordinates to filter feeds spatially
+    :param predicate: the gtfs feed should intersect or should be contained inside the user's bbox
+    :param pretty: display feeds inside a pretty table
+    """
     if bbox is None and predicate is not None:
         raise typer.BadParameter(
             f"Please pass a bbox if you want to filter feeds spatially based on predicate = {predicate}!"
@@ -83,6 +86,8 @@ def list_feeds(
                 ["Feed Source", "Transit URL", "Bounding Box"], theme=Themes.OCEAN, hrules=1
             )
 
+        filtered_srcs = ""
+
         for src in feed_sources:
             feed_bbox: Bbox = src.bbox
             if bbox is not None and predicate == "contains":
@@ -94,6 +99,7 @@ def list_feeds(
                 ):
                     continue
 
+            filtered_srcs += src.__name__ + ", "
             if pretty is True:
                 pretty_output.add_row(
                     [
@@ -109,67 +115,107 @@ def list_feeds(
         if pretty is True:
             print("\n" + pretty_output.get_string())
 
+        if typer.confirm("Do you want to fetch feeds from these sources?"):
+            fetch_feeds(sources=filtered_srcs[:-1])
+
 
 @app.command()
-def fetch_feeds(sources=None):
-    """
+def fetch_feeds(
+    sources: Annotated[
+        Optional[str],
+        typer.Option(
+            "--sources",
+            "-src",
+            help="pass value as a string separated by commas like this: src1,src2,src3",
+        ),
+    ] = None,
+    search: Annotated[
+        Optional[str],
+        typer.Option(
+            "--search",
+            "-s",
+            help="search for feeds based on a string",
+        ),
+    ] = None,
+    output_dir: Annotated[
+        Optional[str],
+        typer.Option(
+            "--output-dir",
+            "-o",
+            help="the directory where the downloaded feeds will be saved",
+        ),
+    ] = "feeds",
+) -> None:
+    """Fetch feeds from sources.
+
     :param sources: List of :FeedSource: modules to fetch; if not set, will fetch all available.
+    :param search: Search for feeds based on a string.
+    :param output_dir: The directory where the downloaded feeds will be saved; default is feeds.
     """
-    statuses = {}  # collect the statuses for all the files
+    # statuses = {}  # collect the statuses for all the files
 
-    # default to use all of them
     if not sources:
-        sources = feed_sources
+        if not search:
+            # fetch all feeds
+            sources = feed_sources
+        else:
+            # fetch feeds based on search
+            sources = [
+                src
+                for src in feed_sources
+                if search.lower() in src.__name__.lower() or search.lower() in src.url.lower()
+            ]
+    else:
+        # fetch feeds based on sources
+        sources = [src for src in feed_sources if src.__name__.lower() in sources.lower()]
 
-    LOG.info("Going to fetch feeds from sources: %s", sources)
+    output_dir_path = os.path.join(os.getcwd(), output_dir)
+    if not os.path.exists(output_dir_path):
+        os.makedirs(output_dir_path)
+
+    LOG.info(f"Going to fetch feeds from sources: {sources}")
     for src in sources:
-        LOG.debug("Going to start fetch for %s...", src)
+        LOG.debug(f"Going to start fetch for {src}...")
         try:
             if issubclass(src, FeedSource):
                 inst = src()
+                inst.ddir = output_dir_path
+                inst.status_file = os.path.join(inst.ddir, src.__name__ + ".pkl")
                 inst.fetch()
-                statuses.update(inst.status)
+                # statuses.update(inst.status)
             else:
-                LOG.warning(
-                    "Skipping class %s, which does not subclass FeedSource.",
-                    src.__name__,
-                )
+                LOG.warning(f"Skipping class {src.__name__}, which does not subclass FeedSource.")
         except AttributeError:
-            LOG.error("Skipping feed %s, which could not be found.", src)
+            LOG.error(f"Skipping feed {src}, which could not be found.")
 
-    # remove last check key set at top level of each status dictionary
-    if "last_check" in statuses:
-        del statuses["last_check"]
-
-    ptable = ColorTable(
-        [
-            "file",
-            "new?",
-            "valid?",
-            "current?",
-            "newly effective?",
-            "error",
-        ],
-        theme=Themes.OCEAN,
-        hrules=1,
-    )
-
-    for file_name in statuses:
-        stat = statuses[file_name]
-        msg = []
-        msg.append(file_name)
-        msg.append("x" if "is_new" in stat and stat["is_new"] else "")
-        msg.append("x" if "is_valid" in stat and stat["is_valid"] else "")
-        msg.append("x" if "is_current" in stat and stat["is_current"] else "")
-        msg.append("x" if "newly_effective" in stat and stat.get("newly_effective") else "")
-        if "error" in stat:
-            msg.append(stat["error"])
-        else:
-            msg.append("")
-        ptable.add_row(msg)
-
-    LOG.info("Results:\n%s", ptable.get_string())
-    LOG.info("All done!")
+    # ptable = ColorTable(
+    #     [
+    #         "file",
+    #         "new?",
+    #         "valid?",
+    #         "current?",
+    #         "newly effective?",
+    #         "error",
+    #     ],
+    #     theme=Themes.OCEAN,
+    #     hrules=1,
+    # )
+    #
+    # for file_name in statuses:
+    #     stat = statuses[file_name]
+    #     msg = []
+    #     msg.append(file_name)
+    #     msg.append("x" if "is_new" in stat and stat["is_new"] else "")
+    #     msg.append("x" if "is_valid" in stat and stat["is_valid"] else "")
+    #     msg.append("x" if "is_current" in stat and stat["is_current"] else "")
+    #     msg.append("x" if "newly_effective" in stat and stat.get("newly_effective") else "")
+    #     if "error" in stat:
+    #         msg.append(stat["error"])
+    #     else:
+    #         msg.append("")
+    #     ptable.add_row(msg)
+    #
+    # LOG.info("\n" + ptable.get_string())
 
 
 if __name__ == "__main__":

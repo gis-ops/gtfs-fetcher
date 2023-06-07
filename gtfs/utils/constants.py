@@ -1,3 +1,4 @@
+import logging
 import time
 from enum import Enum
 
@@ -17,3 +18,7 @@ def spinner(text: str, timer: int) -> None:
     ) as progress:
         progress.add_task(description=text, total=None)
         time.sleep(timer)
+
+
+logging.basicConfig(level=logging.INFO)
+LOG = logging.getLogger()

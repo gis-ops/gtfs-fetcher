@@ -13,7 +13,7 @@ class TestListFeedsCommand:
     def test_help(self, runner):
         result = runner.invoke(app, ["list-feeds", "--help"])
         assert result.exit_code == 0
-        assert "Filter feeds spatially based on bounding box." in result.stdout
+        assert "Filter feeds spatially based on bounding box or list all of them." in result.stdout
 
     def test_bad_args_1(self, runner):
         result = runner.invoke(app, ["list-feeds", "--bbox", "6.626953,49.423342,23.348144"])
@@ -32,16 +32,20 @@ class TestListFeedsCommand:
 
     def test_intersects_predicate(self, runner):
         result = runner.invoke(
-            app, ["list-feeds", "-pd", "intersects", "--bbox", "6.626953,49.423342,23.348144,54.265953"]
+            app,
+            ["list-feeds", "-pd", "intersects", "--bbox", "6.626953,49.423342,23.348144,54.265953"],
+            input="N\n",
         )
         assert result.exit_code == 0
 
     def test_contains_predicate(self, runner):
         result = runner.invoke(
-            app, ["list-feeds", "-pd", "contains", "--bbox", "6.626953,49.423342,23.348144,54.265953"]
+            app,
+            ["list-feeds", "-pd", "contains", "--bbox", "6.626953,49.423342,23.348144,54.265953"],
+            input="N\n",
         )
         assert result.exit_code == 0
 
     def test_pretty(self, runner):
-        result = runner.invoke(app, ["list-feeds", "-pt"])
+        result = runner.invoke(app, ["list-feeds", "-pt"], input="N\n")
         assert result.exit_code == 0
