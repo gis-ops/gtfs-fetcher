@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """Command line interface for fetching GTFS."""
-import os.path
+import os
 from typing import Optional
 
 import typer
@@ -86,7 +86,9 @@ def list_feeds(
                 ["Feed Source", "Transit URL", "Bounding Box"], theme=Themes.OCEAN, hrules=1
             )
 
+
         filtered_srcs = ""
+
 
         for src in feed_sources:
             feed_bbox: Bbox = src.bbox
@@ -99,7 +101,9 @@ def list_feeds(
                 ):
                     continue
 
+
             filtered_srcs += src.__name__ + ", "
+
             if pretty is True:
                 pretty_output.add_row(
                     [
@@ -112,11 +116,13 @@ def list_feeds(
 
             print(src.url)
 
+
         if pretty is True:
             print("\n" + pretty_output.get_string())
 
         if typer.confirm("Do you want to fetch feeds from these sources?"):
             fetch_feeds(sources=filtered_srcs[:-1])
+
 
 
 @app.command()
@@ -154,6 +160,7 @@ def fetch_feeds(
     """
     # statuses = {}  # collect the statuses for all the files
 
+
     if not sources:
         if not search:
             # fetch all feeds
@@ -174,6 +181,7 @@ def fetch_feeds(
         os.makedirs(output_dir_path)
 
     LOG.info(f"Going to fetch feeds from sources: {sources}")
+
     for src in sources:
         LOG.debug(f"Going to start fetch for {src}...")
         try:
