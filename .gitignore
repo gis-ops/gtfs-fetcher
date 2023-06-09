@@ -3,7 +3,7 @@ gtfs/__version__.py
 
 # Generated / downloaded files
 *.zip
-*.p
+*.pkl
 
 # virtualenv
 .venv/

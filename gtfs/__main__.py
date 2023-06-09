@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """Command line interface for fetching GTFS."""
 import os
+import threading
 from typing import Optional
 
 import typer
@@ -35,6 +36,18 @@ def check_bbox(bbox: str) -> Optional[Bbox]:
         raise typer.BadParameter("Area cannot be zero! Please pass a valid bbox.")
 
     return Bbox(min_x, min_y, max_x, max_y)
+
+
+def check_sources(sources: str) -> Optional[str]:
+    """Check if the sources are valid."""
+    if sources is None:
+        return None
+    sources = sources.split(",")
+    for source in sources:
+        if not any(src.__name__.lower() == source.lower() for src in feed_sources):
+            raise typer.BadParameter(f"{source} is not a valid feed source!")
+
+    return ",".join(sources)
 
 
 @app.command()
@@ -86,9 +99,7 @@ def list_feeds(
                 ["Feed Source", "Transit URL", "Bounding Box"], theme=Themes.OCEAN, hrules=1
             )
 
-
         filtered_srcs = ""
-
 
         for src in feed_sources:
             feed_bbox: Bbox = src.bbox
@@ -100,7 +111,6 @@ def list_feeds(
                     not bbox_intersects_bbox(bbox, feed_bbox)
                 ):
                     continue
-
 
             filtered_srcs += src.__name__ + ", "
 
@@ -116,13 +126,11 @@ def list_feeds(
 
             print(src.url)
 
-
         if pretty is True:
             print("\n" + pretty_output.get_string())
 
         if typer.confirm("Do you want to fetch feeds from these sources?"):
             fetch_feeds(sources=filtered_srcs[:-1])
-
 
 
 @app.command()
@@ -132,7 +140,8 @@ def fetch_feeds(
         typer.Option(
             "--sources",
             "-src",
-            help="pass value as a string separated by commas like this: src1,src2,src3",
+            help="pass value as a string separated by commas like this: Berlin,AlbanyNy,...",
+            callback=check_sources,
         ),
     ] = None,
     search: Annotated[
@@ -148,18 +157,26 @@ def fetch_feeds(
         typer.Option(
             "--output-dir",
             "-o",
-            help="the directory where the downloaded feeds will be saved",
+            help="the directory where the downloaded feeds will be saved, default is feeds",
         ),
     ] = "feeds",
+    concurrency: Annotated[
+        Optional[int],
+        typer.Option(
+            "--concurrency",
+            "-c",
+            help="the number of concurrent downloads, default is 4",
+        ),
+    ] = 4,
 ) -> None:
     """Fetch feeds from sources.
 
     :param sources: List of :FeedSource: modules to fetch; if not set, will fetch all available.
     :param search: Search for feeds based on a string.
     :param output_dir: The directory where the downloaded feeds will be saved; default is feeds.
+    :param concurrency: The number of concurrent downloads; default is 4.
     """
     # statuses = {}  # collect the statuses for all the files
-
 
     if not sources:
         if not search:
@@ -173,8 +190,10 @@ def fetch_feeds(
                 if search.lower() in src.__name__.lower() or search.lower() in src.url.lower()
             ]
     else:
-        # fetch feeds based on sources
-        sources = [src for src in feed_sources if src.__name__.lower() in sources.lower()]
+        if search:
+            raise typer.BadParameter("Please pass either sources or search, not both at the same time!")
+        else:
+            sources = [src for src in feed_sources if src.__name__.lower() in sources.lower()]
 
     output_dir_path = os.path.join(os.getcwd(), output_dir)
     if not os.path.exists(output_dir_path):
@@ -182,19 +201,36 @@ def fetch_feeds(
 
     LOG.info(f"Going to fetch feeds from sources: {sources}")
 
-    for src in sources:
-        LOG.debug(f"Going to start fetch for {src}...")
-        try:
-            if issubclass(src, FeedSource):
-                inst = src()
-                inst.ddir = output_dir_path
-                inst.status_file = os.path.join(inst.ddir, src.__name__ + ".pkl")
-                inst.fetch()
-                # statuses.update(inst.status)
-            else:
-                LOG.warning(f"Skipping class {src.__name__}, which does not subclass FeedSource.")
-        except AttributeError:
-            LOG.error(f"Skipping feed {src}, which could not be found.")
+    threads = []
+
+    def thread_worker():
+        while True:
+            try:
+                src = sources.pop(0)
+            except IndexError:
+                break
+
+            LOG.debug(f"Going to start fetch for {src}...")
+            try:
+                if issubclass(src, FeedSource):
+                    inst = src()
+                    inst.ddir = output_dir_path
+                    inst.status_file = os.path.join(inst.ddir, src.__name__ + ".pkl")
+                    inst.fetch()
+                    # statuses.update(inst.status)
+                else:
+                    LOG.warning(f"Skipping class {src.__name__}, which does not subclass FeedSource.")
+            except AttributeError:
+                LOG.error(f"Skipping feed {src}, which could not be found.")
+
+    for _ in range(concurrency):
+        thread = threading.Thread(target=thread_worker)
+        thread.start()
+        threads.append(thread)
+
+    # Wait for all threads to complete
+    for thread in threads:
+        thread.join()
 
     # ptable = ColorTable(
     #     [

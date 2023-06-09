@@ -144,7 +144,7 @@ class FeedSource(ABC):
                 LOG.debug("No last-modified header set")
                 posted_date = datetime.utcnow().strftime(TIMECHECK_FMT)
             self.set_posted_date(feed_file, posted_date)
-            LOG.info("Download completed successfully.")
+            LOG.info(f"Download completed successfully for {feed_file}.")
             return True
         else:
             self.set_error(feed_file, "Download failed")

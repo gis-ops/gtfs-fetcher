@@ -49,3 +49,23 @@ class TestListFeedsCommand:
     def test_pretty(self, runner):
         result = runner.invoke(app, ["list-feeds", "-pt"], input="N\n")
         assert result.exit_code == 0
+
+
+class TestFetchFeedsCommand:
+    def test_help(self, runner):
+        result = runner.invoke(app, ["fetch-feeds", "--help"])
+        assert result.exit_code == 0
+        assert "Fetch feeds from sources." in result.stdout
+
+    def test_bad_args(self, runner):
+        result = runner.invoke(app, ["fetch-feeds", "-src", "berlin", "-s", "cdta"])
+        assert result.exit_code == 2
+        assert "Please pass either sources or search" in result.stdout
+
+    def test_fetch_with_sources(self, runner):
+        result = runner.invoke(app, ["fetch-feeds", "-src", "berlin"])
+        assert result.exit_code == 0
+
+    def test_fetch_with_search(self, runner):
+        result = runner.invoke(app, ["fetch-feeds", "-s", "cdta"])
+        assert result.exit_code == 0
