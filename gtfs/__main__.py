@@ -13,7 +13,7 @@ from .feed_sources import feed_sources
 from .utils.constants import LOG, Predicate, spinner
 from .utils.geom import Bbox, bbox_contains_bbox, bbox_intersects_bbox
 
-app = typer.Typer()
+app = typer.Typer(help="Fetch GTFS feeds from various transit agencies.")
 
 
 def check_bbox(bbox: str) -> Optional[Bbox]:
@@ -69,6 +69,14 @@ def list_feeds(
             help="the gtfs feed should intersect or should be contained inside the user's bbox",
         ),
     ] = None,
+    search: Annotated[
+        Optional[str],
+        typer.Option(
+            "--search",
+            "-s",
+            help="search for feeds based on a string",
+        ),
+    ] = None,
     pretty: Annotated[
         bool,
         typer.Option(
@@ -78,59 +86,74 @@ def list_feeds(
         ),
     ] = False,
 ) -> None:
-    """Filter feeds spatially based on bounding box or list all of them.
+    """Filter feeds spatially based on bounding box or search string.
 
     :param bbox: set of coordinates to filter feeds spatially
     :param predicate: the gtfs feed should intersect or should be contained inside the user's bbox
+    :param search: Search for feeds based on a string.
     :param pretty: display feeds inside a pretty table
     """
-    if bbox is None and predicate is not None:
-        raise typer.BadParameter(
-            f"Please pass a bbox if you want to filter feeds spatially based on predicate = {predicate}!"
-        )
-    elif bbox is not None and predicate is None:
-        raise typer.BadParameter(
-            f"Please pass a predicate if you want to filter feeds spatially based on bbox = {bbox}!"
-        )
+    sources: list = feed_sources
+
+    if search is not None:
+        if bbox is not None or predicate is not None:
+            raise typer.BadParameter("Please pass either bbox or search, not both at the same time!")
+        else:
+            sources = [
+                src
+                for src in feed_sources
+                if search.lower() in src.__name__.lower() or search.lower() in src.url.lower()
+            ]
     else:
-        spinner("Fetching feeds...", 1)
-        if pretty is True:
-            pretty_output = ColorTable(
-                ["Feed Source", "Transit URL", "Bounding Box"], theme=Themes.OCEAN, hrules=1
+        if bbox is None and predicate is not None:
+            raise typer.BadParameter(
+                f"Please pass a bbox if you want to filter feeds spatially based on predicate = {predicate}!"
             )
+        elif bbox is not None and predicate is None:
+            raise typer.BadParameter(
+                f"Please pass a predicate if you want to filter feeds spatially based on bbox = {bbox}!"
+            )
+        else:
+            pass
 
-        filtered_srcs = ""
+    spinner("Fetching feeds...", 1)
+    if pretty is True:
+        pretty_output = ColorTable(
+            ["Feed Source", "Transit URL", "Bounding Box"], theme=Themes.OCEAN, hrules=1
+        )
 
-        for src in feed_sources:
-            feed_bbox: Bbox = src.bbox
-            if bbox is not None and predicate == "contains":
-                if not bbox_contains_bbox(feed_bbox, bbox):
-                    continue
-            elif bbox is not None and predicate == "intersects":
-                if (not bbox_intersects_bbox(feed_bbox, bbox)) and (
-                    not bbox_intersects_bbox(bbox, feed_bbox)
-                ):
-                    continue
+    filtered_srcs: str = ""
 
-            filtered_srcs += src.__name__ + ", "
-
-            if pretty is True:
-                pretty_output.add_row(
-                    [
-                        src.__name__,
-                        src.url,
-                        [feed_bbox.min_x, feed_bbox.min_y, feed_bbox.max_x, feed_bbox.max_y],
-                    ]
-                )
+    for src in sources:
+        feed_bbox: Bbox = src.bbox
+        if bbox is not None and predicate == "contains":
+            if not bbox_contains_bbox(feed_bbox, bbox):
+                continue
+        elif bbox is not None and predicate == "intersects":
+            if (not bbox_intersects_bbox(feed_bbox, bbox)) and (
+                not bbox_intersects_bbox(bbox, feed_bbox)
+            ):
                 continue
 
-            print(src.url)
+        filtered_srcs += src.__name__ + ", "
 
         if pretty is True:
-            print("\n" + pretty_output.get_string())
+            pretty_output.add_row(
+                [
+                    src.__name__,
+                    src.url,
+                    [feed_bbox.min_x, feed_bbox.min_y, feed_bbox.max_x, feed_bbox.max_y],
+                ]
+            )
+            continue
 
-        if typer.confirm("Do you want to fetch feeds from these sources?"):
-            fetch_feeds(sources=filtered_srcs[:-1])
+        print(src.url)
+
+    if pretty is True:
+        print("\n" + pretty_output.get_string())
+
+    if typer.confirm("Do you want to fetch feeds from these sources?"):
+        fetch_feeds(sources=filtered_srcs[:-1])
 
 
 @app.command()
@@ -144,16 +167,8 @@ def fetch_feeds(
             callback=check_sources,
         ),
     ] = None,
-    search: Annotated[
-        Optional[str],
-        typer.Option(
-            "--search",
-            "-s",
-            help="search for feeds based on a string",
-        ),
-    ] = None,
     output_dir: Annotated[
-        Optional[str],
+        str,
         typer.Option(
             "--output-dir",
             "-o",
@@ -172,28 +187,14 @@ def fetch_feeds(
     """Fetch feeds from sources.
 
     :param sources: List of :FeedSource: modules to fetch; if not set, will fetch all available.
-    :param search: Search for feeds based on a string.
     :param output_dir: The directory where the downloaded feeds will be saved; default is feeds.
     :param concurrency: The number of concurrent downloads; default is 4.
     """
-    # statuses = {}  # collect the statuses for all the files
 
     if not sources:
-        if not search:
-            # fetch all feeds
-            sources = feed_sources
-        else:
-            # fetch feeds based on search
-            sources = [
-                src
-                for src in feed_sources
-                if search.lower() in src.__name__.lower() or search.lower() in src.url.lower()
-            ]
+        sources = feed_sources
     else:
-        if search:
-            raise typer.BadParameter("Please pass either sources or search, not both at the same time!")
-        else:
-            sources = [src for src in feed_sources if src.__name__.lower() in sources.lower()]
+        sources = [src for src in feed_sources if src.__name__.lower() in sources.lower()]
 
     output_dir_path = os.path.join(os.getcwd(), output_dir)
     if not os.path.exists(output_dir_path):
@@ -201,7 +202,7 @@ def fetch_feeds(
 
     LOG.info(f"Going to fetch feeds from sources: {sources}")
 
-    threads = []
+    threads: list[threading.Thread] = []
 
     def thread_worker():
         while True:
@@ -217,7 +218,6 @@ def fetch_feeds(
                     inst.ddir = output_dir_path
                     inst.status_file = os.path.join(inst.ddir, src.__name__ + ".pkl")
                     inst.fetch()
-                    # statuses.update(inst.status)
                 else:
                     LOG.warning(f"Skipping class {src.__name__}, which does not subclass FeedSource.")
             except AttributeError:
@@ -231,35 +231,6 @@ def fetch_feeds(
     # Wait for all threads to complete
     for thread in threads:
         thread.join()
-
-    # ptable = ColorTable(
-    #     [
-    #         "file",
-    #         "new?",
-    #         "valid?",
-    #         "current?",
-    #         "newly effective?",
-    #         "error",
-    #     ],
-    #     theme=Themes.OCEAN,
-    #     hrules=1,
-    # )
-    #
-    # for file_name in statuses:
-    #     stat = statuses[file_name]
-    #     msg = []
-    #     msg.append(file_name)
-    #     msg.append("x" if "is_new" in stat and stat["is_new"] else "")
-    #     msg.append("x" if "is_valid" in stat and stat["is_valid"] else "")
-    #     msg.append("x" if "is_current" in stat and stat["is_current"] else "")
-    #     msg.append("x" if "newly_effective" in stat and stat.get("newly_effective") else "")
-    #     if "error" in stat:
-    #         msg.append(stat["error"])
-    #     else:
-    #         msg.append("")
-    #     ptable.add_row(msg)
-    #
-    # LOG.info("\n" + ptable.get_string())
 
 
 if __name__ == "__main__":

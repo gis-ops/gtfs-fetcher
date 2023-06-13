@@ -4,19 +4,14 @@ To add a new feed, add a subclass of this to the `feed_sources` directory.
 """
 import os
 import pickle
-
-# import subprocess
 import zipfile
 from abc import ABC, abstractmethod
 from datetime import datetime
 
 import requests
 
-from gtfs.utils.constants import LOG
+from gtfs.utils.constants import LOG, TIMECHECK_FMT
 from gtfs.utils.geom import Bbox
-
-# format time checks like last-modified header
-TIMECHECK_FMT = "%a, %d %b %Y %H:%M:%S GMT"
 
 
 class FeedSource(ABC):
@@ -50,7 +45,6 @@ class FeedSource(ABC):
             pickle.dump(self.status, status_file)
             LOG.debug(f"Statuses written to {self.status_file}.")
 
-    # TODO - add a method to verify the feed
     def fetch(self) -> bool:
         """Modify this method in subclass for importing feed(s) from agency.
 
@@ -119,7 +113,6 @@ class FeedSource(ABC):
             # Nothing new to fetch; done here
             return False
 
-        # feed_file is local to download directory
         feed_file_path = os.path.join(self.ddir, feed_file + ".zip")
         LOG.info(f"Getting file {feed_file}...from...{url}")
         request = requests.get(url, stream=do_stream)

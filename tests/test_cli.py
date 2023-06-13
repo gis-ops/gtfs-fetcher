@@ -13,7 +13,7 @@ class TestListFeedsCommand:
     def test_help(self, runner):
         result = runner.invoke(app, ["list-feeds", "--help"])
         assert result.exit_code == 0
-        assert "Filter feeds spatially based on bounding box or list all of them." in result.stdout
+        assert "Filter feeds spatially based on bounding box or search string." in result.stdout
 
     def test_bad_args_1(self, runner):
         result = runner.invoke(app, ["list-feeds", "--bbox", "6.626953,49.423342,23.348144"])
@@ -29,6 +29,13 @@ class TestListFeedsCommand:
         result = runner.invoke(app, ["list-feeds", "--bbox", "6.626953,49.423342,6.626953,54.265953"])
         assert result.exit_code == 2
         assert "Area cannot be zero!" in result.stdout
+
+    def test_bad_args_4(self, runner):
+        result = runner.invoke(
+            app, ["list-feeds", "--bbox", "6.626953,49.423342,23.348144,54.265953", "--search", "cdta"]
+        )
+        assert result.exit_code == 2
+        assert "Please pass either bbox or search" in result.stdout
 
     def test_intersects_predicate(self, runner):
         result = runner.invoke(
@@ -56,16 +63,3 @@ class TestFetchFeedsCommand:
         result = runner.invoke(app, ["fetch-feeds", "--help"])
         assert result.exit_code == 0
         assert "Fetch feeds from sources." in result.stdout
-
-    def test_bad_args(self, runner):
-        result = runner.invoke(app, ["fetch-feeds", "-src", "berlin", "-s", "cdta"])
-        assert result.exit_code == 2
-        assert "Please pass either sources or search" in result.stdout
-
-    def test_fetch_with_sources(self, runner):
-        result = runner.invoke(app, ["fetch-feeds", "-src", "berlin"])
-        assert result.exit_code == 0
-
-    def test_fetch_with_search(self, runner):
-        result = runner.invoke(app, ["fetch-feeds", "-s", "cdta"])
-        assert result.exit_code == 0

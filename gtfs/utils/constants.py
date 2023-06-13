@@ -22,3 +22,6 @@ def spinner(text: str, timer: int) -> None:
 
 logging.basicConfig(level=logging.INFO)
 LOG = logging.getLogger()
+
+# format time checks like last-modified header
+TIMECHECK_FMT = "%a, %d %b %Y %H:%M:%S GMT"
