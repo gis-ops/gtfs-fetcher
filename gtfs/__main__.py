@@ -1,53 +1,18 @@
 #!/usr/bin/env python
 """Command line interface for fetching GTFS."""
-import os
-import threading
 from typing import Optional
 
 import typer
 from prettytable.colortable import ColorTable, Themes
 from typing_extensions import Annotated
 
-from .feed_source import FeedSource
 from .feed_sources import feed_sources
+from .utils.check_params import check_bbox, check_output_dir, check_sources
 from .utils.constants import LOG, Predicate, spinner
 from .utils.geom import Bbox, bbox_contains_bbox, bbox_intersects_bbox
+from .utils.multithreading import multi_fetch
 
 app = typer.Typer(help="Fetch GTFS feeds from various transit agencies.")
-
-
-def check_bbox(bbox: str) -> Optional[Bbox]:
-    if bbox is None:
-        return
-    try:
-        min_x, min_y, max_x, max_y = [float(coord) for coord in bbox.split(",")]
-    except ValueError as e:
-        err_message = e.args[0]
-        if "could not convert" in err_message:
-            raise typer.BadParameter("Please pass only numbers as bbox values!")
-        elif "not enough values to unpack" in err_message:
-            raise typer.BadParameter(
-                "Please pass bbox as a string separated by commas like this: min_x,min_y,max_x,max_y"
-            )
-        else:
-            raise typer.BadParameter(f"Unhandled exception: {e}")
-
-    if min_x == max_x or min_y == max_y:
-        raise typer.BadParameter("Area cannot be zero! Please pass a valid bbox.")
-
-    return Bbox(min_x, min_y, max_x, max_y)
-
-
-def check_sources(sources: str) -> Optional[str]:
-    """Check if the sources are valid."""
-    if sources is None:
-        return None
-    sources = sources.split(",")
-    for source in sources:
-        if not any(src.__name__.lower() == source.lower() for src in feed_sources):
-            raise typer.BadParameter(f"{source} is not a valid feed source!")
-
-    return ",".join(sources)
 
 
 @app.command()
@@ -97,32 +62,28 @@ def list_feeds(
 
     if search is not None:
         if bbox is not None or predicate is not None:
-            raise typer.BadParameter("Please pass either bbox or search, not both at the same time!")
-        else:
-            sources = [
-                src
-                for src in feed_sources
-                if search.lower() in src.__name__.lower() or search.lower() in src.url.lower()
-            ]
-    else:
-        if bbox is None and predicate is not None:
             raise typer.BadParameter(
-                f"Please pass a bbox if you want to filter feeds spatially based on predicate = {predicate}!"
-            )
-        elif bbox is not None and predicate is None:
-            raise typer.BadParameter(
-                f"Please pass a predicate if you want to filter feeds spatially based on bbox = {bbox}!"
+                "Please pass either bbox or search text, not both at the same time!"
             )
         else:
-            pass
+            sources = [src for src in feed_sources if search.lower() in src.__name__.lower()]
 
-    spinner("Fetching feeds...", 1)
+    if bbox is None and predicate is not None:
+        raise typer.BadParameter(
+            f"Please pass a bbox if you want to filter feeds spatially based on predicate = {predicate}!"
+        )
+
+    if bbox is not None and predicate is None:
+        raise typer.BadParameter(
+            f"Please pass a predicate if you want to filter feeds spatially based on bbox = {bbox}!"
+        )
+
+    spinner("Filtering feeds...", 1)
+
     if pretty is True:
         pretty_output = ColorTable(
             ["Feed Source", "Transit URL", "Bounding Box"], theme=Themes.OCEAN, hrules=1
         )
-
-    filtered_srcs: str = ""
 
     for src in sources:
         feed_bbox: Bbox = src.bbox
@@ -134,8 +95,6 @@ def list_feeds(
                 not bbox_intersects_bbox(bbox, feed_bbox)
             ):
                 continue
-
-        filtered_srcs += src.__name__ + ", "
 
         if pretty is True:
             pretty_output.add_row(
@@ -151,9 +110,6 @@ def list_feeds(
 
     if pretty is True:
         print("\n" + pretty_output.get_string())
-
-    if typer.confirm("Do you want to fetch feeds from these sources?"):
-        fetch_feeds(sources=filtered_srcs[:-1])
 
 
 @app.command()
@@ -173,6 +129,7 @@ def fetch_feeds(
             "--output-dir",
             "-o",
             help="the directory where the downloaded feeds will be saved, default is feeds",
+            callback=check_output_dir,
         ),
     ] = "feeds",
     concurrency: Annotated[
@@ -187,7 +144,8 @@ def fetch_feeds(
     """Fetch feeds from sources.
 
     :param sources: List of :FeedSource: modules to fetch; if not set, will fetch all available.
-    :param output_dir: The directory where the downloaded feeds will be saved; default is feeds.
+    :param output_dir: The directory where the downloaded feeds will be saved; default is "feeds"
+     in current working directory.
     :param concurrency: The number of concurrent downloads; default is 4.
     """
 
@@ -196,41 +154,9 @@ def fetch_feeds(
     else:
         sources = [src for src in feed_sources if src.__name__.lower() in sources.lower()]
 
-    output_dir_path = os.path.join(os.getcwd(), output_dir)
-    if not os.path.exists(output_dir_path):
-        os.makedirs(output_dir_path)
-
     LOG.info(f"Going to fetch feeds from sources: {sources}")
 
-    threads: list[threading.Thread] = []
-
-    def thread_worker():
-        while True:
-            try:
-                src = sources.pop(0)
-            except IndexError:
-                break
-
-            LOG.debug(f"Going to start fetch for {src}...")
-            try:
-                if issubclass(src, FeedSource):
-                    inst = src()
-                    inst.ddir = output_dir_path
-                    inst.status_file = os.path.join(inst.ddir, src.__name__ + ".pkl")
-                    inst.fetch()
-                else:
-                    LOG.warning(f"Skipping class {src.__name__}, which does not subclass FeedSource.")
-            except AttributeError:
-                LOG.error(f"Skipping feed {src}, which could not be found.")
-
-    for _ in range(concurrency):
-        thread = threading.Thread(target=thread_worker)
-        thread.start()
-        threads.append(thread)
-
-    # Wait for all threads to complete
-    for thread in threads:
-        thread.join()
+    multi_fetch(sources, output_dir, concurrency)
 
 
 if __name__ == "__main__":

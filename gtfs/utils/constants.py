@@ -10,6 +10,12 @@ class Predicate(str, Enum):
     contains = "contains"
 
 
+class Feed(str, Enum):
+    new_available = "new_available"
+    new_not_available = "new_not_available"
+    info_missing = "info_missing"
+
+
 def spinner(text: str, timer: int) -> None:
     with Progress(
         SpinnerColumn(),

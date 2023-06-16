@@ -10,7 +10,7 @@ from datetime import datetime
 
 import requests
 
-from gtfs.utils.constants import LOG, TIMECHECK_FMT
+from gtfs.utils.constants import LOG, TIMECHECK_FMT, Feed
 from gtfs.utils.geom import Bbox
 
 
@@ -38,7 +38,7 @@ class FeedSource(ABC):
     def bbox(self) -> Bbox:
         pass
 
-    def write_status(self):
+    def write_status(self) -> None:
         """Write pickled log of feed statuses and last times files were downloaded."""
         LOG.debug(f"Downloading finished. Writing status file {self.status_file}...")
         with open(self.status_file, "wb") as status_file:
@@ -51,22 +51,16 @@ class FeedSource(ABC):
         By default, checks the last-modified header to see if a new
         download is available, streams the download if so, and verifies the new GTFS.
         """
-        if self.url:
-            feed_file = self.__class__.__name__
-            if self.download_feed(feed_file, self.url):
-                self.write_status()
-                # if self.verify(feed_file):
-                #     LOG.info('GTFS verification succeeded.')
-                #     return True
-                # else:
-                #     LOG.error('GTFS verification failed.')
-                #     return False
-            else:
-                return False
-        else:
+        if not self.url:
             raise ValueError("URL not set for feed source!")
 
-    def check_header_newer(self, feed_file: str, url: str):
+        feed_file = self.__class__.__name__
+        if not self.download_feed(feed_file, self.url):
+            return False
+
+        self.write_status()
+
+    def check_header_newer(self, feed_file: str, url: str) -> Feed:
         """Check if last-modified header indicates a new download is available.
 
         :param feed_file: Name of downloaded file (relative to :ddir:)
@@ -75,7 +69,7 @@ class FeedSource(ABC):
         """
         if not os.path.exists(self.status_file):
             LOG.debug(f"Status file {self.status_file} not found.")
-            return 0
+            return Feed.info_missing
 
         with open(self.status_file, "rb") as f:
             last_status = pickle.load(f)
@@ -87,19 +81,19 @@ class FeedSource(ABC):
                 last_mod = hdr.get("last-modified")
                 if last_fetch >= last_mod:
                     LOG.info(f"No new download available for {feed_file}.")
-                    return -1
+                    return Feed.new_not_available
                 else:
                     LOG.info(f"New download available for {feed_file}.")
                     LOG.info(f"Last download from: {last_fetch}.")
                     LOG.info(f"New download posted: {last_mod}")
-                    return 1
+                    return Feed.new_available
             else:
                 # should try to find another way to check for new feeds if header not set
                 LOG.debug(f"No last-modified header set for {feed_file} download link.")
-                return 0
+                return Feed.info_missing
         else:
             LOG.debug(f"Time check entry for {feed_file} not found.")
-            return 0
+            return Feed.info_missing
 
     def download_feed(self, feed_file: str, url: str, do_stream: bool = True) -> bool:
         """Download feed.
@@ -109,7 +103,7 @@ class FeedSource(ABC):
         :param do_stream: If True, stream the download
                 :returns: True if download was successful
         """
-        if self.check_header_newer(feed_file, url) == -1:
+        if self.check_header_newer(feed_file, url) == Feed.new_not_available:
             # Nothing new to fetch; done here
             return False
 
@@ -143,7 +137,7 @@ class FeedSource(ABC):
             self.set_error(feed_file, "Download failed")
             return False
 
-    def set_posted_date(self, feed_file: str, posted_date: str):
+    def set_posted_date(self, feed_file: str, posted_date: str) -> None:
         """Update feed status posted date. Creates new feed status if none found.
 
         :param feed_file: Name of feed file, relative to :ddir:
@@ -153,7 +147,7 @@ class FeedSource(ABC):
         stat["posted_date"] = posted_date
         self.status[feed_file] = stat
 
-    def set_error(self, feed_file: str, msg: str):
+    def set_error(self, feed_file: str, msg: str) -> None:
         """If error encountered in processing, set status error message, and unset other fields.
 
         :param feed_file: Name of feed file, relative to :ddir:
