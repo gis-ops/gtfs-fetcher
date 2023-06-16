@@ -13,7 +13,7 @@ class TestListFeedsCommand:
     def test_help(self, runner):
         result = runner.invoke(app, ["list-feeds", "--help"])
         assert result.exit_code == 0
-        assert "Filter feeds spatially based on bounding box." in result.stdout
+        assert "Filter feeds spatially based on bounding box or search string." in result.stdout
 
     def test_bad_args_1(self, runner):
         result = runner.invoke(app, ["list-feeds", "--bbox", "6.626953,49.423342,23.348144"])
@@ -30,18 +30,36 @@ class TestListFeedsCommand:
         assert result.exit_code == 2
         assert "Area cannot be zero!" in result.stdout
 
+    def test_bad_args_4(self, runner):
+        result = runner.invoke(
+            app, ["list-feeds", "--bbox", "6.626953,49.423342,23.348144,54.265953", "--search", "cdta"]
+        )
+        assert result.exit_code == 2
+        assert "Please pass either bbox or search" in result.stdout
+
     def test_intersects_predicate(self, runner):
         result = runner.invoke(
-            app, ["list-feeds", "-pd", "intersects", "--bbox", "6.626953,49.423342,23.348144,54.265953"]
+            app,
+            ["list-feeds", "-pd", "intersects", "--bbox", "6.626953,49.423342,23.348144,54.265953"],
+            input="N\n",
         )
         assert result.exit_code == 0
 
     def test_contains_predicate(self, runner):
         result = runner.invoke(
-            app, ["list-feeds", "-pd", "contains", "--bbox", "6.626953,49.423342,23.348144,54.265953"]
+            app,
+            ["list-feeds", "-pd", "contains", "--bbox", "6.626953,49.423342,23.348144,54.265953"],
+            input="N\n",
         )
         assert result.exit_code == 0
 
     def test_pretty(self, runner):
-        result = runner.invoke(app, ["list-feeds", "-pt"])
+        result = runner.invoke(app, ["list-feeds", "-pt"], input="N\n")
         assert result.exit_code == 0
+
+
+class TestFetchFeedsCommand:
+    def test_help(self, runner):
+        result = runner.invoke(app, ["fetch-feeds", "--help"])
+        assert result.exit_code == 0
+        assert "Fetch feeds from sources." in result.stdout
